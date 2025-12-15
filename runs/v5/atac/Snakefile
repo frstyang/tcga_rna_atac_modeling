@@ -1,0 +1,218 @@
+"""
+Snakemake pipeline for TCGA ATAC-seq modeling.
+
+Pipeline steps:
+    1.1 Construct pseudobulks from query data
+    1.2 Log-normalize pseudobulks (query and TCGA reference)
+    1.3 Create input peak sets for modeling
+    1.4 Train ATAC logistic regression models (per peak set)
+    1.5 Plot model performances
+"""
+
+import os
+
+# ============================================================================
+# Configuration
+# ============================================================================
+os.makedirs("logs", exist_ok=True)
+
+# Directories
+CODE_DIR = "../../../code/train_atac"
+OUT_DIR = "../../../out/v5"
+PEAK_SETS_DIR = os.path.join(OUT_DIR, "peak_sets")
+
+# Input files
+BEDFILE = "/data1/chanj3/LUAS.multiome.results/epigenetic/gorces_2018_cancer_ATAC_data/TCGA-ATAC_PanCancer_PeakSet.bed"
+SAMPLESHEET = "samplesheet.csv"
+TCGA_PANCAN_RAW_PATH = "/data1/chanj3/LUAS.multiome.results/epigenetic/gorces_2018_cancer_ATAC_data/TCGA-ATAC_PanCan_Raw_Counts.rds"
+
+# Parameters
+N_TOP_PEAKS = 100000
+
+# Conda environments
+SNAPATAC2_ENV = "/home/yangf4/envs/SnapATAC2"
+INFERCNV_ENV = "/home/yangf4/envs/infercnv"
+
+# Peak sets to process (will be determined dynamically after step 1.3)
+# These are the expected peak set names based on create_input_peak_sets.py
+PEAK_SETS = [
+    "hvp_5000",
+    "hvp_10000",
+    "hvp_20000",
+    "hvp_50000",
+    "fdr_1e-6_top_2500_per",
+    "fdr_1e-6_top_5000_per",
+]
+
+# ============================================================================
+# Target rule
+# ============================================================================
+
+rule all:
+    input:
+        os.path.join(OUT_DIR, "all_models_cv_metrics.png")
+
+# ============================================================================
+# Step 1.1: Construct pseudobulks
+# ============================================================================
+
+rule construct_pseudobulks:
+    """Construct query pseudobulks from single-cell ATAC data."""
+    input:
+        bedfile = BEDFILE,
+        samplesheet = SAMPLESHEET,
+    output:
+        pseudobulks = os.path.join(OUT_DIR, "query_pseudobulks.mtx"),
+        group_names = os.path.join(OUT_DIR, "query_group_names.txt"),
+        peaks = os.path.join(OUT_DIR, "query_peaks.txt"),
+    params:
+        code_dir = CODE_DIR,
+        out_dir = OUT_DIR,
+    conda: SNAPATAC2_ENV
+    threads: 6
+    resources:
+        mem_mb = 48000,
+        runtime = 120,
+    log:
+        "logs/construct_pseudobulks.log"
+    shell:
+        """
+        python -u {params.code_dir}/construct_query_pseudobulks.py \
+            {input.bedfile} \
+            {input.samplesheet} \
+            {params.out_dir} \
+            2>&1 | tee {log}
+        """
+
+# ============================================================================
+# Step 1.2: Log-normalize pseudobulks
+# ============================================================================
+
+rule log_normalize_pseudobulks:
+    """Log-normalize query and TCGA reference pseudobulks."""
+    input:
+        query_pseudobulks = os.path.join(OUT_DIR, "query_pseudobulks.mtx"),
+        query_group_names = os.path.join(OUT_DIR, "query_group_names.txt"),
+        query_peaks = os.path.join(OUT_DIR, "query_peaks.txt"),
+        tcga_raw = TCGA_PANCAN_RAW_PATH,
+    output:
+        tcga_logcpm = os.path.join(OUT_DIR, "tcga_log2cpm.rds"),
+        query_logcpm = os.path.join(OUT_DIR, "query_log2cpm.rds"),
+        peaks_metadata = os.path.join(OUT_DIR, "peaks_metadata.csv"),
+    params:
+        code_dir = CODE_DIR,
+        out_dir = OUT_DIR,
+    conda: INFERCNV_ENV,
+    threads: 6
+    resources:
+        mem_mb = 48000,
+        runtime = 120,
+    log:
+        "logs/logcpm_pseudobulks.log"
+    shell:
+        """
+        Rscript {params.code_dir}/construct_ref_query_logcpm_pseudobulks.R \
+            {input.query_pseudobulks} \
+            {input.query_group_names} \
+            {input.query_peaks} \
+            {input.tcga_raw} \
+            {params.out_dir} \
+            2>&1 | tee {log}
+        """
+
+# ============================================================================
+# Step 1.3: Create input peak sets
+# ============================================================================
+
+rule create_peak_sets:
+    """Create input peak sets for model training."""
+    input:
+        tcga_logcpm = os.path.join(OUT_DIR, "tcga_log2cpm.rds"),
+        peaks_metadata = os.path.join(OUT_DIR, "peaks_metadata.csv"),
+        query_logcpm = os.path.join(OUT_DIR, "query_log2cpm.rds"),
+    output:
+        peak_sets = expand(os.path.join(PEAK_SETS_DIR, "{peak_set}.txt"), peak_set=PEAK_SETS),
+    params:
+        code_dir = CODE_DIR,
+        out_dir = PEAK_SETS_DIR,
+        n_top_peaks = N_TOP_PEAKS,
+    conda: SNAPATAC2_ENV,
+    threads: 6
+    resources:
+        mem_mb = 48000,
+        runtime = 120,
+    log:
+        "logs/create_peak_sets.log"
+    shell:
+        """
+        python -u {params.code_dir}/create_input_peak_sets.py \
+            {input.tcga_logcpm} \
+            {input.peaks_metadata} \
+            {params.out_dir} \
+            --n_top_peaks {params.n_top_peaks} \
+            --query_logcpm_path {input.query_logcpm} \
+            2>&1 | tee {log}
+        """
+
+# ============================================================================
+# Step 1.4: Train ATAC models (one per peak set)
+# ============================================================================
+
+rule train_atac_model:
+    """Train multiclass logistic regression model for LUAD vs LUSC classification."""
+    input:
+        tcga_logcpm = os.path.join(OUT_DIR, "tcga_log2cpm.rds"),
+        peak_set = os.path.join(PEAK_SETS_DIR, "{peak_set}.txt"),
+    output:
+        cv_metrics = os.path.join(OUT_DIR, "{peak_set}", "cv_metrics.pkl"),
+        models = os.path.join(OUT_DIR, "{peak_set}", "models.pkl")
+    params:
+        code_dir = CODE_DIR,
+        out_dir = os.path.join(OUT_DIR, "{peak_set}"),
+    conda: SNAPATAC2_ENV,
+    threads: 6
+    resources:
+        mem_mb = 48000,
+        runtime = 120,
+    log:
+        "logs/train_atac_{peak_set}.log"
+    shell:
+        """
+        python -u {params.code_dir}/train_multiclass_logistic_regression_model.py \
+            {input.tcga_logcpm} \
+            {input.peak_set} \
+            {params.out_dir} \
+            --luad_vs_lusc \
+            2>&1 | tee {log}
+        """
+
+# ============================================================================
+# Step 1.5: Plot model performances
+# ============================================================================
+
+rule plot_model_performances:
+    """Plot cross-validation metrics for all trained models."""
+    input:
+        cv_metrics = expand(os.path.join(OUT_DIR, "{peak_set}", "cv_metrics.pkl"), peak_set=PEAK_SETS),
+    output:
+        plot = os.path.join(OUT_DIR, "all_models_cv_metrics.png"),
+    params:
+        code_dir = CODE_DIR,
+        peak_sets_dir = PEAK_SETS_DIR,
+        models_dir = OUT_DIR,
+        output_dir = OUT_DIR,
+    conda: SNAPATAC2_ENV,
+    threads: 6
+    resources:
+        mem_mb = 48000,
+        runtime = 120,
+    log:
+        "logs/plot_performances.log"
+    shell:
+        """
+        python -u {params.code_dir}/plot_model_performances.py \
+            {params.peak_sets_dir} \
+            {params.models_dir} \
+            {params.output_dir} \
+            2>&1 | tee {log}
+        """

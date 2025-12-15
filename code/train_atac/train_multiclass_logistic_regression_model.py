@@ -15,23 +15,22 @@ from sklearn.model_selection import cross_validate
 from sklearn.linear_model import LogisticRegression
 
 parser = argparse.ArgumentParser()
+parser.add_argument('tcga_logcpm_path')
 parser.add_argument('peak_set_path')
+parser.add_argument('output_dir') # where output model, metrics are saved
 parser.add_argument('--luad_vs_lusc', action='store_true')
 args = parser.parse_args()
+input_path = args.tcga_logcpm_path
 peaks_path = args.peak_set_path
+output_dir = args.output_dir
 with open(peaks_path, 'r') as f:
     peaks = [line.strip() for line in f.readlines()]
 print(f'Using {len(peaks)} peaks from {peaks_path}')
 
-models_dir_name = peaks_path.split("/")[-1].replace(".txt", "")
-if args.luad_vs_lusc:
-    models_dir_name = 'luad_vs_lusc_' + models_dir_name
-out_dir = f'/data1/chanj3/LUAS.multiome.results/epigenetic/TCGA_modeling/out/log_reg/{models_dir_name}'
-print(f"Making directory {out_dir}")
-os.makedirs(out_dir, exist_ok=True)
+print(f"Making directory {output_dir}")
+os.makedirs(output_dir, exist_ok=True)
 
-data_dir = '/data1/chanj3/LUAS.multiome.results/epigenetic/TCGA_modeling/out'
-tcga_data = pyreadr.read_r(f'{data_dir}/tcga_log2cpm_jointTMMwsp.rds')[None]
+tcga_data = pyreadr.read_r(input_path)[None]
 adata = sc.AnnData(tcga_data.T)
 adata.obs['cancer_type'] = [s.split('_')[0] for s in adata.obs_names]
 if args.luad_vs_lusc:
@@ -142,9 +141,9 @@ def plot_cv_boxplots(results, metrics=None, figsize=(12, 4), cmap=plt.cm.Blues_r
 # }
 print("Plotting cross validation results...")
 plot_cv_boxplots(C_to_scores, metrics=["test_accuracy","test_balanced_accuracy","test_f1_macro"],
-                 figsize=(12,4.5), save_path=f'{out_dir}/cv_boxplots.png')
+                 figsize=(12,4.5), save_path=f'{output_dir}/cv_boxplots.png')
 
-with open(f'{out_dir}/cv_metrics.pkl', 'wb') as f:
+with open(f'{output_dir}/cv_metrics.pkl', 'wb') as f:
     pickle.dump(C_to_scores, f)
 
 print("Training models on full data...")
@@ -153,8 +152,8 @@ for C in C_vals:
     lr = LogisticRegression(C=C, class_weight='balanced', max_iter=1000)
     lr.fit(X, y)
     C_to_model[C] = lr
-with open(f'{out_dir}/models.pkl', 'wb') as f:
+with open(f'{output_dir}/models.pkl', 'wb') as f:
     pickle.dump(C_to_model, f)
-with open(f'{out_dir}/peaks.txt', 'w') as f:
+with open(f'{output_dir}/peaks.txt', 'w') as f:
     for g in peaks:
         f.write(g + '\n')

@@ -1,0 +1,45 @@
+# Snakemake SLURM profile configuration
+# Usage: snakemake --profile profile
+
+# SLURM executor (requires: pip install snakemake-executor-plugin-slurm)
+executor: slurm
+
+# Number of jobs to run in parallel
+jobs: 10
+
+# Default resources for all rules
+default-resources:
+  slurm_partition: cpu
+  mem_mb: 48000
+  runtime: 120  # minutes
+  cpus_per_task: 6
+
+# Resource scaling
+set-resources:
+  construct_pseudobulks:
+    runtime: 120
+  log_normalize_pseudobulks:
+    runtime: 120
+  create_peak_sets:
+    runtime: 120
+  train_atac_model:
+    runtime: 120
+  plot_model_performances:
+    runtime: 120
+
+# Threads per rule
+set-threads:
+  construct_pseudobulks: 6
+  log_normalize_pseudobulks: 6
+  create_peak_sets: 6
+  train_atac_model: 6
+  plot_model_performances: 6
+
+# Latency wait for filesystem
+latency-wait: 60
+
+# Rerun incomplete jobs
+rerun-incomplete: true
+
+# Print shell commands
+printshellcmds: true
