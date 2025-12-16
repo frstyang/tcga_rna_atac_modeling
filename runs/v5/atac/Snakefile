@@ -12,37 +12,31 @@ Pipeline steps:
 import os
 
 # ============================================================================
-# Configuration
+# Configuration (loaded from config file)
 # ============================================================================
-os.makedirs("logs", exist_ok=True)
+
+LOG_DIR = config.get("log_dir", "logs")
+os.makedirs(LOG_DIR, exist_ok=True)
 
 # Directories
-CODE_DIR = "../../../code/train_atac"
-OUT_DIR = "../../../out/v5/atac"
+CODE_DIR = config["code_dir"]
+OUT_DIR = config["out_dir"]
 PEAK_SETS_DIR = os.path.join(OUT_DIR, "peak_sets")
 
 # Input files
-BEDFILE = "/data1/chanj3/LUAS.multiome.results/epigenetic/gorces_2018_cancer_ATAC_data/TCGA-ATAC_PanCancer_PeakSet.bed"
-SAMPLESHEET = "samplesheet.csv"
-TCGA_PANCAN_RAW_PATH = "/data1/chanj3/LUAS.multiome.results/epigenetic/gorces_2018_cancer_ATAC_data/TCGA-ATAC_PanCan_Raw_Counts.rds"
+BEDFILE = config["bedfile"]
+SAMPLESHEET = config["samplesheet"]
+TCGA_PANCAN_RAW_PATH = config["tcga_pancan_raw_path"]
 
 # Parameters
-N_TOP_PEAKS = 100000
+N_TOP_PEAKS = config["n_top_peaks"]
 
 # Conda environments
-SNAPATAC2_ENV = "/home/yangf4/envs/SnapATAC2"
-INFERCNV_ENV = "/home/yangf4/envs/infercnv"
+SNAPATAC2_ENV = config["snapatac2_env"]
+INFERCNV_ENV = config["infercnv_env"]
 
-# Peak sets to process (will be determined dynamically after step 1.3)
-# These are the expected peak set names based on create_input_peak_sets.py
-PEAK_SETS = [
-    "hvp_5000",
-    "hvp_10000",
-    "hvp_20000",
-    "hvp_50000",
-    "fdr_1e-6_top_2500_per",
-    "fdr_1e-6_top_5000_per",
-]
+# Peak sets to process
+PEAK_SETS = config["peak_sets"]
 
 # ============================================================================
 # Target rule
@@ -74,7 +68,7 @@ rule construct_pseudobulks:
         mem_mb = 48000,
         runtime = 120,
     log:
-        "logs/construct_pseudobulks.log"
+        os.path.join(LOG_DIR, "construct_pseudobulks.log")
     shell:
         """
         python -u {params.code_dir}/construct_query_pseudobulks.py \
@@ -108,7 +102,7 @@ rule log_normalize_pseudobulks:
         mem_mb = 48000,
         runtime = 120,
     log:
-        "logs/logcpm_pseudobulks.log"
+        os.path.join(LOG_DIR, "logcpm_pseudobulks.log")
     shell:
         """
         Rscript {params.code_dir}/construct_ref_query_logcpm_pseudobulks.R \
@@ -142,7 +136,7 @@ rule create_peak_sets:
         mem_mb = 48000,
         runtime = 120,
     log:
-        "logs/create_peak_sets.log"
+        os.path.join(LOG_DIR, "create_peak_sets.log")
     shell:
         """
         python -u {params.code_dir}/create_input_peak_sets.py \
@@ -175,7 +169,7 @@ rule train_atac_model:
         mem_mb = 48000,
         runtime = 120,
     log:
-        "logs/train_atac_{peak_set}.log"
+        os.path.join(LOG_DIR, "train_atac_{peak_set}.log")
     shell:
         """
         python -u {params.code_dir}/train_multiclass_logistic_regression_model.py \
@@ -207,7 +201,7 @@ rule plot_model_performances:
         mem_mb = 48000,
         runtime = 120,
     log:
-        "logs/plot_performances.log"
+        os.path.join(LOG_DIR, "plot_performances.log")
     shell:
         """
         python -u {params.code_dir}/plot_model_performances.py \

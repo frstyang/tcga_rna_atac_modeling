@@ -80,13 +80,16 @@ print(adata.obs['cancer_type'].value_counts())
 # sc.tl.rank_genes_groups "Expects logarithmized data"
 sc.tl.rank_genes_groups(adata, 'cancer_type', method='wilcoxon')
 luad_daps_df = sc.get.rank_genes_groups_df(adata, group='LUAD')
-diff_peaks = luad_daps_df[(luad_daps_df['pvals_adj'] < 1e-6) & (np.abs(luad_daps_df['logfoldchanges']) > 1)]
-print("number of differential peaks", diff_peaks.shape)
+luad_daps_df = luad_daps_df[(luad_daps_df['pvals_adj'] < 1e-6) & (np.abs(luad_daps_df['logfoldchanges']) > 1)]
+print("number of differential peaks", luad_daps_df.shape)
 
-n_top_per = [5000, 2500]
+n_top_per = [2500, 1500]
 for n in n_top_per:
+    pos_daps_df = luad_daps_df[luad_daps_df['logfoldchanges'] > 0]
+    neg_daps_df = luad_daps_df[luad_daps_df['logfoldchanges'] < 0]
     top_peaks = pd.concat([
-        luad_daps_df.sort_values('logfoldchanges', ascending=False).head(n),
-        luad_daps_df.sort_values('logfoldchanges', ascending=True).head(n)
+        pos_daps_df.sort_values('logfoldchanges', ascending=False).head(n),
+        neg_daps_df.sort_values('logfoldchanges', ascending=True).head(n)
     ])
+    print(f"diff peak set size: {len(top_peaks)}")
     write_peaks(top_peaks['names'], f'{args.output_dir}/fdr_1e-6_top_{n}_per.txt')

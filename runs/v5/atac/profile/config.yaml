@@ -43,3 +43,7 @@ rerun-incomplete: true
 
 # Print shell commands
 printshellcmds: true
+
+max-status-checks-per-second: 10
+
+rerun-triggers: mtime

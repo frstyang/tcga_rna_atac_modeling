@@ -1,0 +1,25 @@
+# Directories
+log_dir: "logs_clusters"
+code_dir: "../../../code/train_atac"
+out_dir: "../../../out/v5/clusters_atac"
+
+# Input files
+bedfile: "/data1/chanj3/LUAS.multiome.results/epigenetic/gorces_2018_cancer_ATAC_data/TCGA-ATAC_PanCancer_PeakSet.bed"
+samplesheet: "clusters_samplesheet.csv"
+tcga_pancan_raw_path: "/data1/chanj3/LUAS.multiome.results/epigenetic/gorces_2018_cancer_ATAC_data/TCGA-ATAC_PanCan_Raw_Counts.rds"
+
+# Parameters
+n_top_peaks: 100000
+
+# Conda environments
+snapatac2_env: "/home/yangf4/envs/SnapATAC2"
+infercnv_env: "/home/yangf4/envs/infercnv"
+
+# Peak sets to process
+peak_sets:
+  - "hvp_5000"
+  - "hvp_10000"
+  - "hvp_20000"
+  - "hvp_50000"
+  - "fdr_1e-6_top_1500_per"
+  - "fdr_1e-6_top_2500_per"

@@ -1,6 +1,6 @@
 #!/usr/bin/bash
 
-out="samplesheet.csv"
+out="metacells_samplesheet.csv"
 echo "name,rna_h5ad_path,assignments_path" > "$out"
 
 for f in /data1/chanj3/LUAS.multiome.results/data/rna_atac_v5/*_cancer.h5mu; do
