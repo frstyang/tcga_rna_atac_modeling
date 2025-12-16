@@ -4,19 +4,6 @@ library(ggplot2)
 library(Matrix)
 library(preprocessCore)
 
-#args <- list(
-#  query_pseudobulks_path =
-#    "/data1/chanj3/LUAS.multiome.results/epigenetic/TCGA_modeling/out/v5/query_pseudobulks.mtx",
-#  query_pseudobulks_names_path =
-#    "/data1/chanj3/LUAS.multiome.results/epigenetic/TCGA_modeling/out/v5/query_group_names.txt",
-#  query_peaks_path =
-#    "/data1/chanj3/LUAS.multiome.results/epigenetic/TCGA_modeling/out/v5/query_peaks.txt",
-#  TCGA_PanCan_Raw_path =
-#    "/data1/chanj3/LUAS.multiome.results/epigenetic/gorces_2018_cancer_ATAC_data/TCGA-ATAC_PanCan_Raw_Counts.rds",
-#  output_dir = "/data1/chanj3/LUAS.multiome.results/epigenetic/TCGA_modeling/out/v5",
-#  n_top_peaks = 100000
-#)
-
 print.matrix <- function(m, quote=FALSE, right=TRUE, max=FALSE){
   write.table(format(m, justify="right"),
               row.names=FALSE, col.names=FALSE, quote=FALSE)
