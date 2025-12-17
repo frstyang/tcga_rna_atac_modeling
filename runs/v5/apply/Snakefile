@@ -1,0 +1,75 @@
+"""
+Snakemake pipeline that is essentially a wrapper for apply_to_query.py. 
+"""
+
+import os
+
+# ============================================================================
+# Configuration (loaded from config file)
+# ============================================================================
+
+LOG_DIR = config.get("log_dir", "logs")
+os.makedirs(LOG_DIR, exist_ok=True)
+
+# Directories
+CODE_DIR = config["code_dir"]
+OUT_DIR = config["out_dir"]
+PEAK_SET = config["peak_set"]
+ATAC_C = config["atac_C"]
+GENE_SET = config["gene_set"]
+RNA_C = config["rna_C"]
+RNA_DIR = config["rna_dir"]
+ATAC_DIR = config["atac_dir"]
+
+# Conda environments
+SNAPATAC2_ENV = config["snapatac2_env"]
+
+# ============================================================================
+# Target rule
+# ============================================================================
+
+rule all:
+    input:
+        os.path.join(OUT_DIR, "sorted_barplot_median_adjusted.png"),
+        shap_vals = os.path.join(OUT_DIR, "shap", "atac_shap_vals.csv"),
+        coefs = os.path.join(OUT_DIR, "shap", "atac_coefs.csv")
+
+# ============================================================================
+# Step 1.1: apply to query
+# ============================================================================
+
+rule apply_to_query:
+    """Construct query pseudobulks from single-cell ATAC data."""
+    input:
+        atac_dir = ATAC_DIR,
+        rna_dir = RNA_DIR, 
+    output:
+        barplot = os.path.join(OUT_DIR, "sorted_barplot_median_adjusted.png"),
+        shap_vals = os.path.join(OUT_DIR, "shap", "atac_shap_vals.csv"),
+        coefs = os.path.join(OUT_DIR, "shap", "atac_coefs.csv")
+    params:
+        code_dir = CODE_DIR,
+        out_dir = OUT_DIR,
+        atac_C = ATAC_C,
+        rna_C = RNA_C,
+        peak_set = PEAK_SET,
+        gene_set = GENE_SET,
+    conda: SNAPATAC2_ENV
+    threads: 6
+    resources:
+        mem_mb = 48000,
+        runtime = 120,
+    log:
+        os.path.join(LOG_DIR, "apply_to_query.log")
+    shell:
+        """
+        python -u {params.code_dir}/apply_to_query.py \
+            {params.out_dir} \
+            {input.atac_dir}/query_log2cpm.rds \
+            {input.rna_dir}/query_log2cpm.rds \
+            {input.atac_dir}/{params.peak_set} \
+            {params.atac_C} \
+            {input.rna_dir}/{params.gene_set} \
+            {params.rna_C} 
+            2>&1 | tee {log}
+        """
