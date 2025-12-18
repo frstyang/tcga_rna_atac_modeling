@@ -1,7 +1,7 @@
 # Directories
-log_dir: "logs_clusters"
+log_dir: "logs_clusters_lasso"
 code_dir: "../../../code/train_atac"
-out_dir: "../../../out/v5/clusters/atac"
+out_dir: "../../../out/v5/clusters_lasso/atac"
 
 # Input files
 bedfile: "/data1/chanj3/LUAS.multiome.results/epigenetic/gorces_2018_cancer_ATAC_data/TCGA-ATAC_PanCancer_PeakSet.bed"
@@ -10,6 +10,9 @@ tcga_pancan_raw_path: "/data1/chanj3/LUAS.multiome.results/epigenetic/gorces_201
 
 # Parameters
 n_top_peaks: 100000
+l1_ratio: 1
+solver: 'liblinear'
+penalty: "l1"
 
 # Conda environments
 snapatac2_env: "/home/yangf4/envs/SnapATAC2"

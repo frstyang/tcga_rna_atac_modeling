@@ -15,6 +15,7 @@ parser$add_argument('query_peaks_path')
 parser$add_argument('TCGA_PanCan_Raw_path')
 parser$add_argument('output_dir')
 parser$add_argument('--n_top_peaks', type = 'integer', default = NULL)
+parser$add_argument('--scran_norm', action = 'store_true')
 args <- parser$parse_args()
 
 ## ---- Load objects ----
@@ -67,26 +68,41 @@ sprintf('Common peaks after filtering %d', length(common_peaks))
 pancan_raw <- pancan_raw[common_peaks, , drop=FALSE]
 query_counts <- query_counts[common_peaks, , drop=FALSE]
 
-## ---- Concatenate and normalize jointly ----
-all_counts <- cbind(pancan_raw, query_counts)
+if (!args$scran_norm) {
+  ## ---- Concatenate and normalize jointly ----
+  all_counts <- cbind(pancan_raw, query_counts)
+  y <- DGEList(counts = all_counts)
+  ## TMMwsp is robust for sparse counts (good for ATAC)
+  y <- calcNormFactors(y, method = "TMMwsp")
+  sprintf('fraction nonzero of query counts after peak filtering: %f', frac_nnz(query_counts))
+  sprintf('fraction nonzero of pancan counts after peak filtering: %f', frac_nnz(pancan_raw))
+  
+  ## Choose a small prior.count appropriate for sparse ATAC
+  ## (edgeR scales this by library size internally, so a single value is fine)
+  prior <- 1  # you can try 0.25 if you want less smoothing of zeros
+  logCPM_joint <- cpm(y, log = TRUE, prior.count = prior)  # normalized.lib.sizes=TRUE by default for DGEList
+  
+  ## ---- Split back out if you want separate outputs ----
+  ref_cols <- colnames(pancan_raw)
+  query_cols <- colnames(query_counts)
+  
+  pancan_logcpm <- logCPM_joint[, ref_cols, drop=FALSE]
+  query_logcpm <- logCPM_joint[, query_cols, drop=FALSE]
+} else {
+  y <- DGEList(counts = pancan_raw)
+  y <- calcNormFactors(y, method = "TMM")
+  prior <- 1  # you can try 0.25 if you want less smoothing of zeros
+  pancan_logcpm <- cpm(y, log = TRUE, prior.count = prior)  # normalized.lib.sizes=TRUE by default for DGEList
 
-y <- DGEList(counts = all_counts)
-## TMMwsp is robust for sparse counts (good for ATAC)
-y <- calcNormFactors(y, method = "TMMwsp")
-sprintf('fraction nonzero of query counts after peak filtering: %f', frac_nnz(query_counts))
-sprintf('fraction nonzero of pancan counts after peak filtering: %f', frac_nnz(pancan_raw))
-
-## Choose a small prior.count appropriate for sparse ATAC
-## (edgeR scales this by library size internally, so a single value is fine)
-prior <- 1  # you can try 0.25 if you want less smoothing of zeros
-logCPM_joint <- cpm(y, log = TRUE, prior.count = prior)  # normalized.lib.sizes=TRUE by default for DGEList
-
-## ---- Split back out if you want separate outputs ----
-ref_cols <- colnames(pancan_raw)
-query_cols <- colnames(query_counts)
-
-pancan_logcpm <- logCPM_joint[, ref_cols, drop=FALSE]
-query_logcpm <- logCPM_joint[, query_cols, drop=FALSE]
+  library(scran)
+  sce <- SingleCellExperiment(assays = list(counts = query_counts))
+  clusters <- quickCluster(sce)
+  sce <- computeSumFactors(sce, clusters=clusters)
+  summary(sizeFactors(sce))
+  query_logcpm_sce <- logNormCounts(sce)
+  query_logcpm <- assay(query_logcpm_sce, "logcounts") # get the actual matrix from SCE object
+  query_logcpm <- as.matrix(query_logcpm)
+}
 ## ---- Save LUAS (and TCGA if helpful) ----
 saveRDS(as.data.frame(query_logcpm), file.path(args$output_dir, 'query_log2cpm.rds'))
 saveRDS(pancan_logcpm, file.path(args$output_dir, 'tcga_log2cpm.rds'))

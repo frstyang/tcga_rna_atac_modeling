@@ -1,12 +1,17 @@
 # Directories
-log_dir: "logs_clusters"
+log_dir: "logs_clusters_lasso"
 code_dir: "../../../code/train_rna"
-out_dir: "../../../out/v5/clusters/rna"
+out_dir: "../../../out/v5/clusters_lasso/rna"
 
 # Input files
 tcga_xena_path: "/data1/chanj3/LUAS.multiome.results/TCGA_expression_modeling/data/EB++AdjustPANCAN_IlluminaHiSeq_RNASeqV2.geneExp.xena"
 tcga_clindata_path: "/data1/chanj3/LUAS.multiome.results/TCGA_expression_modeling/data/Survival_SupplementalTable_S1_20171025_xena_sp"
 samplesheet: "clusters_samplesheet.csv"
+
+# Parameters
+l1_ratio: 1
+solver: "liblinear"
+penalty: "l1"
 
 # Conda environments
 snapatac2_env: "/home/yangf4/envs/SnapATAC2"

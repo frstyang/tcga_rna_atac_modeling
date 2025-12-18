@@ -20,6 +20,9 @@ parser.add_argument('tcga_clindata_path')
 parser.add_argument('gene_set_path')
 parser.add_argument('output_dir')
 parser.add_argument('--luad_vs_lusc', action='store_true')
+parser.add_argument('--penalty', default='l2')
+parser.add_argument('--l1_ratio', default=0.0, type=float)
+parser.add_argument('--solver', default="lbfgs")
 args = parser.parse_args()
 genes_path = args.gene_set_path
 output_dir = args.output_dir
@@ -79,9 +82,10 @@ print('X.shape', X.shape)
 
 C_vals = [0.001, 0.01, 0.1, 1.0, 10.0, 100.0, 1000.0]
 print(f"Running cross validation with C values: {C_vals}")
+print(f"l1 ratio: {args.l1_ratio}")
 C_to_scores = {}
 for C in tqdm(C_vals):
-    lr = LogisticRegression(C=C, class_weight='balanced', max_iter=1000)
+    lr = LogisticRegression(penalty=args.penalty, C=C, class_weight='balanced', max_iter=1000, l1_ratio=args.l1_ratio, solver=args.solver)
     scores = cross_validate(lr, X, y, cv=5, scoring=scoring)
     C_to_scores[C] = scores
 
@@ -180,9 +184,10 @@ with open(f'{output_dir}/cv_metrics.pkl', 'wb') as f:
     pickle.dump(C_to_scores, f)
 
 print("Training models on full data...")
+print(f"L1 ratio: {args.l1_ratio}")
 C_to_model = {}
 for C in C_vals:
-    lr = LogisticRegression(C=C, class_weight='balanced', max_iter=1000)
+    lr = LogisticRegression(penalty=args.penalty, C=C, class_weight='balanced', max_iter=1000, l1_ratio=args.l1_ratio, solver=args.solver)
     lr.fit(X, y)
     C_to_model[C] = lr
 with open(f'{output_dir}/models.pkl', 'wb') as f:

@@ -1,15 +1,16 @@
 # Directories
-log_dir: "logs_clusters"
+log_dir: "logs_metacells_scran"
 code_dir: "../../../code/train_atac"
-out_dir: "../../../out/v5/clusters/atac"
+out_dir: "../../../out/v5/metacells_scran/atac"
 
 # Input files
 bedfile: "/data1/chanj3/LUAS.multiome.results/epigenetic/gorces_2018_cancer_ATAC_data/TCGA-ATAC_PanCancer_PeakSet.bed"
-samplesheet: "clusters_samplesheet.csv"
+samplesheet: "metacells_samplesheet.csv"
 tcga_pancan_raw_path: "/data1/chanj3/LUAS.multiome.results/epigenetic/gorces_2018_cancer_ATAC_data/TCGA-ATAC_PanCan_Raw_Counts.rds"
 
 # Parameters
 n_top_peaks: 100000
+scran_norm: True
 
 # Conda environments
 snapatac2_env: "/home/yangf4/envs/SnapATAC2"

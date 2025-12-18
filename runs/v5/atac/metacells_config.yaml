@@ -1,7 +1,7 @@
 # Directories
-log_dir: "logs"
+log_dir: "logs_metacells"
 code_dir: "../../../code/train_atac"
-out_dir: "../../../out/v5/atac"
+out_dir: "../../../out/v5/metacells/atac"
 
 # Input files
 bedfile: "/data1/chanj3/LUAS.multiome.results/epigenetic/gorces_2018_cancer_ATAC_data/TCGA-ATAC_PanCancer_PeakSet.bed"

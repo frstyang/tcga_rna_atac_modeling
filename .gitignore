@@ -6,3 +6,4 @@
 **/*.log
 **/*.Rproj
 **/.snakemake
+**/.ipynb_checkpoints

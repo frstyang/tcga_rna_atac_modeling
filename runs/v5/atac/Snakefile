@@ -30,6 +30,10 @@ TCGA_PANCAN_RAW_PATH = config["tcga_pancan_raw_path"]
 
 # Parameters
 N_TOP_PEAKS = config["n_top_peaks"]
+L1_RATIO = config.get("l1_ratio", 0)
+SOLVER = config.get("solver", "lbfgs")
+PENALTY = config.get("penalty", "l2")
+SCRAN_NORM = config.get("scran_norm", False)
 
 # Conda environments
 SNAPATAC2_ENV = config["snapatac2_env"]
@@ -96,6 +100,7 @@ rule log_normalize_pseudobulks:
     params:
         code_dir = CODE_DIR,
         out_dir = OUT_DIR,
+        scran_flag = "--scran_norm" if SCRAN_NORM else "",
     conda: INFERCNV_ENV,
     threads: 6
     resources:
@@ -111,6 +116,7 @@ rule log_normalize_pseudobulks:
             {input.query_peaks} \
             {input.tcga_raw} \
             {params.out_dir} \
+            {params.scran_flag} \
             2>&1 | tee {log}
         """
 
@@ -163,6 +169,9 @@ rule train_atac_model:
     params:
         code_dir = CODE_DIR,
         out_dir = os.path.join(OUT_DIR, "{peak_set}"),
+        l1_ratio = L1_RATIO,
+        solver = SOLVER,
+        penalty = PENALTY
     conda: SNAPATAC2_ENV,
     threads: 6
     resources:
@@ -177,6 +186,9 @@ rule train_atac_model:
             {input.peak_set} \
             {params.out_dir} \
             --luad_vs_lusc \
+            --l1_ratio {params.l1_ratio} \
+            --solver {params.solver} \
+            --penalty {params.penalty} \
             2>&1 | tee {log}
         """
 

@@ -1,7 +1,7 @@
 # Directories
 log_dir: "logs_metacells"
 code_dir: "../../../code/train_rna"
-out_dir: "../../../out/v5/metacells_rna"
+out_dir: "../../../out/v5/metacells/rna"
 
 # Input files
 tcga_xena_path: "/data1/chanj3/LUAS.multiome.results/TCGA_expression_modeling/data/EB++AdjustPANCAN_IlluminaHiSeq_RNASeqV2.geneExp.xena"

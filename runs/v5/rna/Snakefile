@@ -27,6 +27,11 @@ TCGA_XENA_PATH = config["tcga_xena_path"]
 TCGA_CLINDATA_PATH = config["tcga_clindata_path"]
 SAMPLESHEET = config["samplesheet"]
 
+# Params
+L1_RATIO = config.get("l1_ratio", 0)
+SOLVER = config.get("solver", "lbfgs")
+PENALTY = config.get("penalty", "l2")
+
 # Conda environments
 SNAPATAC2_ENV = "/home/yangf4/envs/SnapATAC2"
 INFERCNV_ENV = "/home/yangf4/envs/infercnv"
@@ -152,6 +157,9 @@ rule train_rna_model:
     params:
         code_dir = CODE_DIR,
         out_dir = os.path.join(OUT_DIR, "{gene_set}"),
+        l1_ratio = L1_RATIO,
+        solver = SOLVER,
+        penalty = PENALTY
     conda: SNAPATAC2_ENV,
     threads: 6
     resources:
@@ -167,6 +175,9 @@ rule train_rna_model:
             {input.gene_set} \
             {params.out_dir} \
             --luad_vs_lusc \
+            --l1_ratio {params.l1_ratio} \
+            --solver {params.solver} \
+            --penalty {params.penalty} \
             2>&1 | tee {log}
         """
 
