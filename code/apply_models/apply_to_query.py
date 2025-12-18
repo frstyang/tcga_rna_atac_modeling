@@ -79,12 +79,6 @@ def plot_kde(logits, ax=None, label='ATAC', show=True, showpeak=True):
         median_x = np.median(logits)
         ax.axvline(valley_x, color='r', linestyle='-')
         ax.axvline(median_x, color='b', linestyle='--')
-        def get_y(frac):
-            ylim = ax.get_ylim()
-            return ylim[0] + frac*(ylim[1] - ylim[0])
-        def get_xd(frac):
-            xlim = ax.get_xlim()
-            return frac*(xlim[1] - xlim[0])
     
     # Plot
     ax.hist(logits, bins=50, density=True, alpha=0.5, label=label)
@@ -94,8 +88,18 @@ def plot_kde(logits, ax=None, label='ATAC', show=True, showpeak=True):
     if show:
         plt.show()
     if showpeak:
-        ax.text(valley_x + get_xd(0.03), get_y(0.6), f'{valley_x:.2f}', color='r')
-        ax.text(median_x + get_xd(0.03), get_y(0.6), f'{median_x:.2f}', color='b')
+        def get_y(frac):
+            ylim = ax.get_ylim()
+            return ylim[0] + frac*(ylim[1] - ylim[0])
+        def get_xd(frac):
+            xlim = ax.get_xlim()
+            return frac*(xlim[1] - xlim[0])
+        if label == 'ATAC':
+            y_frac = 0.8
+        else:
+            y_frac = 0.6
+        ax.text(valley_x + get_xd(0.02), get_y(y_frac - 0.4), f'{valley_x:.2f}', color='r', fontsize=15)
+        ax.text(median_x + get_xd(0.02), get_y(y_frac), f'{median_x:.2f}', color='b', fontsize=15)
         return valley_x, median_x
 
 print("Plotting logits densities")
@@ -266,6 +270,8 @@ def plot_stacked_probs(probs, class_labels=None, instance_labels=None,
         ax.set_ylim(0, 1.0)
         ax.tick_params(axis='both', labelsize=12)
         ax.set_ylabel('Predicted probability', fontsize=14)
+        x_span = x_pos[-1] - x_pos[0]
+        ax.set_xlim(x_pos[0] - 0.015*x_span, x_pos[-1] + 0.015*x_span)
     axes[-1].set_xlabel(xlabel, fontsize=14)
     if save_path is not None:
         fig.savefig(save_path, dpi=200, bbox_inches='tight')
