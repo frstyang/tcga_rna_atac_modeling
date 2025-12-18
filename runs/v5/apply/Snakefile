@@ -29,170 +29,58 @@ SNAPATAC2_ENV = config["snapatac2_env"]
 # ============================================================================
 # Target rule
 # ============================================================================
+names = ["custom", "hv_small", "hv_med", "hv_large"]
+all_inputs = []
+for name in names:
+    bar_plot = os.path.join(OUT_DIR, f"apply_{name}", "sorted_barplot_median_adjusted.png")
+    shap_vals = os.path.join(OUT_DIR, f"apply_{name}", "shap", "atac_shap_vals.csv")
+    all_inputs.append(bar_plot)
+    all_inputs.append(shap_vals)
 
 rule all:
     input:
-        os.path.join(OUT_DIR, "apply_custom", "sorted_barplot_median_adjusted.png"),
-        os.path.join(OUT_DIR, "apply_custom", "shap", "atac_shap_vals.csv"),
-        os.path.join(OUT_DIR, "apply_custom", "shap", "atac_coefs.csv"),
-        os.path.join(OUT_DIR, "apply_hv_small", "sorted_barplot_median_adjusted.png"),
-        os.path.join(OUT_DIR, "apply_hv_small", "shap", "atac_shap_vals.csv"),
-        os.path.join(OUT_DIR, "apply_hv_small", "shap", "atac_coefs.csv"),
-        os.path.join(OUT_DIR, "apply_hv_med", "sorted_barplot_median_adjusted.png"),
-        os.path.join(OUT_DIR, "apply_hv_med", "shap", "atac_shap_vals.csv"),
-        os.path.join(OUT_DIR, "apply_hv_med", "shap", "atac_coefs.csv"),
-        os.path.join(OUT_DIR, "apply_hv_large", "sorted_barplot_median_adjusted.png"),
-        os.path.join(OUT_DIR, "apply_hv_large", "shap", "atac_shap_vals.csv"),
-        os.path.join(OUT_DIR, "apply_hv_large", "shap", "atac_coefs.csv")
+        all_inputs
 
-# ============================================================================
-# Step 1.1: apply to query
-# ============================================================================
+def make_apply_to_query_rule(name, peak_set, gene_set, atac_C, rna_C, even_barplot):
+    rule:
+        name: f"apply_to_query_{name}"
+        input:
+            atac_dir = ATAC_DIR,
+            rna_dir = RNA_DIR, 
+        output:
+            barplot = os.path.join(OUT_DIR, f"apply_{name}", "sorted_barplot_median_adjusted.png"),
+            shap_vals = os.path.join(OUT_DIR, f"apply_{name}", "shap", "atac_shap_vals.csv"),
+            coefs = os.path.join(OUT_DIR, f"apply_{name}", "shap", "atac_coefs.csv")
+        params:
+            code_dir = CODE_DIR,
+            out_dir = os.path.join(OUT_DIR, f"apply_{name}"),
+            atac_C = atac_C,
+            rna_C = rna_C,
+            peak_set = peak_set,
+            gene_set = gene_set,
+            even_barplot_flag = "--even_barplot" if even_barplot else "",
+        conda: SNAPATAC2_ENV
+        threads: 6
+        resources:
+            mem_mb = 48000,
+            runtime = 120,
+        log:
+            os.path.join(LOG_DIR, f"apply_to_query_{name}.log")
+        shell:
+            """
+            python -u {params.code_dir}/apply_to_query.py \
+                {params.out_dir} \
+                {input.atac_dir}/query_log2cpm.rds \
+                {input.rna_dir}/query_log2cpm.rds \
+                {input.atac_dir}/{params.peak_set} \
+                {params.atac_C} \
+                {input.rna_dir}/{params.gene_set} \
+                {params.rna_C} \
+                {params.even_barplot_flag} \
+                2>&1 | tee {log}
+            """
 
-rule apply_to_query_custom:
-    input:
-        atac_dir = ATAC_DIR,
-        rna_dir = RNA_DIR, 
-    output:
-        barplot = os.path.join(OUT_DIR, "apply_custom", "sorted_barplot_median_adjusted.png"),
-        shap_vals = os.path.join(OUT_DIR, "apply_custom", "shap", "atac_shap_vals.csv"),
-        coefs = os.path.join(OUT_DIR, "apply_custom", "shap", "atac_coefs.csv")
-    params:
-        code_dir = CODE_DIR,
-        out_dir = os.path.join(OUT_DIR, "apply_custom"),
-        atac_C = ATAC_C,
-        rna_C = RNA_C,
-        peak_set = PEAK_SET,
-        gene_set = GENE_SET,
-        even_barplot_flag = "--even_barplot" if EVEN_BARPLOT else "",
-    conda: SNAPATAC2_ENV
-    threads: 6
-    resources:
-        mem_mb = 48000,
-        runtime = 120,
-    log:
-        os.path.join(LOG_DIR, "apply_to_query.log")
-    shell:
-        """
-        python -u {params.code_dir}/apply_to_query.py \
-            {params.out_dir} \
-            {input.atac_dir}/query_log2cpm.rds \
-            {input.rna_dir}/query_log2cpm.rds \
-            {input.atac_dir}/{params.peak_set} \
-            {params.atac_C} \
-            {input.rna_dir}/{params.gene_set} \
-            {params.rna_C} \
-            {params.even_barplot_flag} \
-            2>&1 | tee {log}
-        """
-
-rule apply_to_query_hv_small:
-    input:
-        atac_dir = ATAC_DIR,
-        rna_dir = RNA_DIR, 
-    output:
-        barplot = os.path.join(OUT_DIR, "apply_hv_small", "sorted_barplot_median_adjusted.png"),
-        shap_vals = os.path.join(OUT_DIR, "apply_hv_small", "shap", "atac_shap_vals.csv"),
-        coefs = os.path.join(OUT_DIR, "apply_hv_small", "shap", "atac_coefs.csv")
-    params:
-        code_dir = CODE_DIR,
-        out_dir = os.path.join(OUT_DIR, "apply_hv_small"),
-        atac_C = DEFAULT_C,
-        rna_C = DEFAULT_C,
-        peak_set = "hvp_5000",
-        gene_set = "hvg_500",
-        even_barplot_flag = "--even_barplot" if EVEN_BARPLOT else "",
-    conda: SNAPATAC2_ENV
-    threads: 6
-    resources:
-        mem_mb = 48000,
-        runtime = 120,
-    log:
-        os.path.join(LOG_DIR, "apply_to_query.log")
-    shell:
-        """
-        python -u {params.code_dir}/apply_to_query.py \
-            {params.out_dir} \
-            {input.atac_dir}/query_log2cpm.rds \
-            {input.rna_dir}/query_log2cpm.rds \
-            {input.atac_dir}/{params.peak_set} \
-            {params.atac_C} \
-            {input.rna_dir}/{params.gene_set} \
-            {params.rna_C} \
-            {params.even_barplot_flag} \
-            2>&1 | tee {log}
-        """
-
-rule apply_to_query_hv_med:
-    input:
-        atac_dir = ATAC_DIR,
-        rna_dir = RNA_DIR, 
-    output:
-        barplot = os.path.join(OUT_DIR, "apply_hv_med", "sorted_barplot_median_adjusted.png"),
-        shap_vals = os.path.join(OUT_DIR, "apply_hv_med", "shap", "atac_shap_vals.csv"),
-        coefs = os.path.join(OUT_DIR, "apply_hv_med", "shap", "atac_coefs.csv")
-    params:
-        code_dir = CODE_DIR,
-        out_dir = os.path.join(OUT_DIR, "apply_hv_med"),
-        atac_C = DEFAULT_C,
-        rna_C = DEFAULT_C,
-        peak_set = "hvp_10000",
-        gene_set = "hvg_3000",
-        even_barplot_flag = "--even_barplot" if EVEN_BARPLOT else "",
-    conda: SNAPATAC2_ENV
-    threads: 6
-    resources:
-        mem_mb = 48000,
-        runtime = 120,
-    log:
-        os.path.join(LOG_DIR, "apply_to_query.log")
-    shell:
-        """
-        python -u {params.code_dir}/apply_to_query.py \
-            {params.out_dir} \
-            {input.atac_dir}/query_log2cpm.rds \
-            {input.rna_dir}/query_log2cpm.rds \
-            {input.atac_dir}/{params.peak_set} \
-            {params.atac_C} \
-            {input.rna_dir}/{params.gene_set} \
-            {params.rna_C} \
-            {params.even_barplot_flag} \
-            2>&1 | tee {log}
-        """
-
-rule apply_to_query_hv_large:
-    input:
-        atac_dir = ATAC_DIR,
-        rna_dir = RNA_DIR, 
-    output:
-        barplot = os.path.join(OUT_DIR, "apply_hv_large", "sorted_barplot_median_adjusted.png"),
-        shap_vals = os.path.join(OUT_DIR, "apply_hv_large", "shap", "atac_shap_vals.csv"),
-        coefs = os.path.join(OUT_DIR, "apply_hv_large", "shap", "atac_coefs.csv")
-    params:
-        code_dir = CODE_DIR,
-        out_dir = os.path.join(OUT_DIR, "apply_hv_large"),
-        atac_C = DEFAULT_C,
-        rna_C = DEFAULT_C,
-        peak_set = "hvp_50000",
-        gene_set = "hvg_5000",
-        even_barplot_flag = "--even_barplot" if EVEN_BARPLOT else "",
-    conda: SNAPATAC2_ENV
-    threads: 6
-    resources:
-        mem_mb = 48000,
-        runtime = 120,
-    log:
-        os.path.join(LOG_DIR, "apply_to_query.log")
-    shell:
-        """
-        python -u {params.code_dir}/apply_to_query.py \
-            {params.out_dir} \
-            {input.atac_dir}/query_log2cpm.rds \
-            {input.rna_dir}/query_log2cpm.rds \
-            {input.atac_dir}/{params.peak_set} \
-            {params.atac_C} \
-            {input.rna_dir}/{params.gene_set} \
-            {params.rna_C} \
-            {params.even_barplot_flag} \
-            2>&1 | tee {log}
-        """
+make_apply_to_query_rule("custom", PEAK_SET, GENE_SET, ATAC_C, RNA_C, EVEN_BARPLOT)
+make_apply_to_query_rule("hv_small", "hvp_5000", "hvg_500", DEFAULT_C, DEFAULT_C, EVEN_BARPLOT)
+make_apply_to_query_rule("hv_med", "hvp_10000", "hvg_3000", DEFAULT_C, DEFAULT_C, EVEN_BARPLOT)
+make_apply_to_query_rule("hv_large", "hvp_50000", "hvg_5000", DEFAULT_C, DEFAULT_C, EVEN_BARPLOT)
