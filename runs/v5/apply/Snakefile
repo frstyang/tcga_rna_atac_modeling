@@ -25,6 +25,7 @@ RNA_C = config["rna_C"]
 DEFAULT_C = config["default_C"]
 EVEN_BARPLOT = config.get("even_barplot", True)
 S = config.get("S", 1)
+COR_THRESHOLD = config.get("cor_threshold", 0.1)
 
 # Conda environments
 SNAPATAC2_ENV = config["snapatac2_env"]
@@ -38,9 +39,11 @@ for name in names:
     bar_plot = os.path.join(OUT_DIR, f"apply_{name}", "sorted_barplot_median_adjusted.png")
     shap_vals = os.path.join(OUT_DIR, f"apply_{name}", "shap", "atac_shap_vals.csv")
     rna_scc_feats = os.path.join(OUT_DIR, f"apply_{name}", "top_features", "rna_active_SCC_features.csv")
+    linked_atac_feats = os.path.join(OUT_DIR, f"apply_{name}", "top_features", "atac_active_SCC_features_linked.csv"),
     all_inputs.append(bar_plot)
     all_inputs.append(shap_vals)
     all_inputs.append(rna_scc_feats)
+    all_inputs.append(linked_atac_feats)
 
 rule all:
     input:
@@ -102,6 +105,7 @@ def make_get_top_features_rule(name, S):
             shap_dir = os.path.join(OUT_DIR, f"apply_{name}", "shap"),
             out_dir = os.path.join(OUT_DIR, f"apply_{name}", "top_features"),
             S = S,
+            probs_file = os.path.join(OUT_DIR, f"apply_{name}", "SCC_probs_median_adjusted.csv")
         conda: SNAPATAC2_ENV
         threads: 6
         resources:
@@ -114,6 +118,7 @@ def make_get_top_features_rule(name, S):
             python -u {params.code_dir}/get_top_features.py \
                 {params.out_dir} \
                 {params.shap_dir} \
+                {params.probs_file} \
                 --S {params.S} \
                 2>&1 | tee {log}
             """
@@ -122,3 +127,42 @@ make_get_top_features_rule("custom", S)
 make_get_top_features_rule("hv_small", S)
 make_get_top_features_rule("hv_med", S)
 make_get_top_features_rule("hv_large", S)
+
+def make_link_top_atac_features_rule(name, peak_set, cor_threshold):
+    rule:
+        name: f"link_top_atac_features_{name}"
+        input:
+            os.path.join(OUT_DIR, f"apply_{name}", "top_features", "atac_active_SCC_features.csv"),
+        output:
+            os.path.join(OUT_DIR, f"apply_{name}", "top_features", "atac_active_SCC_features_linked.csv"),
+        params:
+            code_dir = CODE_DIR,
+            atac_lognorm_path = os.path.join(ATAC_DIR, "query_log2cpm.rds"),
+            rna_lognorm_path = os.path.join(RNA_DIR, "query_log2cpm.rds"),
+            peak_set_path = os.path.join(ATAC_DIR, peak_set, "peaks.txt"),
+            top_features_dir = os.path.join(OUT_DIR, f"apply_{name}", "top_features"),
+            out_dir = os.path.join(OUT_DIR, f"apply_{name}"),
+            cor_threshold = cor_threshold,
+        conda: SNAPATAC2_ENV
+        threads: 6
+        resources:
+            mem_mb = 48000,
+            runtime = 120,
+        log:
+            os.path.join(LOG_DIR, f"link_top_atac_features_{name}.log")
+        shell:
+            """
+            python -u {params.code_dir}/link_top_atac_features.py \
+                {params.atac_lognorm_path} \
+                {params.rna_lognorm_path} \
+                {params.peak_set_path} \
+                {params.top_features_dir} \
+                {params.out_dir} \
+                --cor_threshold {params.cor_threshold} \
+                2>&1 | tee {log}
+            """
+
+make_link_top_atac_features_rule("custom", PEAK_SET, COR_THRESHOLD)
+make_link_top_atac_features_rule("hv_small", "hvp_5000", COR_THRESHOLD)
+make_link_top_atac_features_rule("hv_med", "hvp_10000", COR_THRESHOLD)
+make_link_top_atac_features_rule("hv_large", "hvp_50000", COR_THRESHOLD)

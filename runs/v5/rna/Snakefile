@@ -94,7 +94,6 @@ rule log_normalize_pseudobulks:
         query_genes = os.path.join(OUT_DIR, "query_genes.txt"),
     output:
         query_logcpm = os.path.join(OUT_DIR, "query_log2cpm.rds"),
-        query_genes = os.path.join(OUT_DIR, "query_genes.txt")
     params:
         code_dir = CODE_DIR,
         out_dir = OUT_DIR,

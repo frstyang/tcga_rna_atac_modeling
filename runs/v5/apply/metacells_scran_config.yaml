@@ -9,7 +9,7 @@ atac_C: "0.1"
 rna_C: "0.001"
 rna_dir: "../../../out/v5/metacells/rna"
 atac_dir: "../../../out/v5/metacells_scran/atac"
-default_C: "10"
+default_C: "1"
 
 # Conda environments
 snapatac2_env: "/home/yangf4/envs/SnapATAC2"

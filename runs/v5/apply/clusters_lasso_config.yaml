@@ -4,12 +4,12 @@ code_dir: "../../../code/apply_models"
 out_dir: "../../../out/v5/clusters_lasso"
 
 peak_set: "fdr_1e-6_top_2500_per"
-gene_set: "max_fdr_1e-6_min_logfc_2_top_200_per"
+gene_set: "max_fdr_1e-6_min_logfc_2"
 atac_C: "10"
 rna_C: "0.1"
 rna_dir: "../../../out/v5/clusters_lasso/rna"
 atac_dir: "../../../out/v5/clusters_lasso/atac"
-default_C: "1"
+default_C: "0.1"
 
 # Conda environments
 snapatac2_env: "/home/yangf4/envs/SnapATAC2"
