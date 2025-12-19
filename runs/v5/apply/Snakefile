@@ -14,14 +14,17 @@ os.makedirs(LOG_DIR, exist_ok=True)
 # Directories
 CODE_DIR = config["code_dir"]
 OUT_DIR = config["out_dir"]
+RNA_DIR = config["rna_dir"]
+ATAC_DIR = config["atac_dir"]
+
+# Parameters
 PEAK_SET = config["peak_set"]
 ATAC_C = config["atac_C"]
 GENE_SET = config["gene_set"]
 RNA_C = config["rna_C"]
-RNA_DIR = config["rna_dir"]
-ATAC_DIR = config["atac_dir"]
 DEFAULT_C = config["default_C"]
 EVEN_BARPLOT = config.get("even_barplot", True)
+S = config.get("S", 1)
 
 # Conda environments
 SNAPATAC2_ENV = config["snapatac2_env"]
@@ -34,8 +37,10 @@ all_inputs = []
 for name in names:
     bar_plot = os.path.join(OUT_DIR, f"apply_{name}", "sorted_barplot_median_adjusted.png")
     shap_vals = os.path.join(OUT_DIR, f"apply_{name}", "shap", "atac_shap_vals.csv")
+    rna_scc_feats = os.path.join(OUT_DIR, f"apply_{name}", "top_features", "rna_active_SCC_features.csv")
     all_inputs.append(bar_plot)
     all_inputs.append(shap_vals)
+    all_inputs.append(rna_scc_feats)
 
 rule all:
     input:
@@ -84,3 +89,36 @@ make_apply_to_query_rule("custom", PEAK_SET, GENE_SET, ATAC_C, RNA_C, EVEN_BARPL
 make_apply_to_query_rule("hv_small", "hvp_5000", "hvg_500", DEFAULT_C, DEFAULT_C, EVEN_BARPLOT)
 make_apply_to_query_rule("hv_med", "hvp_10000", "hvg_3000", DEFAULT_C, DEFAULT_C, EVEN_BARPLOT)
 make_apply_to_query_rule("hv_large", "hvp_50000", "hvg_5000", DEFAULT_C, DEFAULT_C, EVEN_BARPLOT)
+
+def make_get_top_features_rule(name, S):
+    rule:
+        name: f"get_top_features_{name}"
+        input:
+            os.path.join(OUT_DIR, f"apply_{name}", "shap", "atac_shap_vals.csv"),
+        output:
+            os.path.join(OUT_DIR, f"apply_{name}", "top_features", "rna_active_SCC_features.csv")
+        params:
+            code_dir = CODE_DIR,
+            shap_dir = os.path.join(OUT_DIR, f"apply_{name}", "shap"),
+            out_dir = os.path.join(OUT_DIR, f"apply_{name}", "top_features"),
+            S = S,
+        conda: SNAPATAC2_ENV
+        threads: 6
+        resources:
+            mem_mb = 48000,
+            runtime = 120,
+        log:
+            os.path.join(LOG_DIR, f"get_top_features_{name}.log")
+        shell:
+            """
+            python -u {params.code_dir}/get_top_features.py \
+                {params.out_dir} \
+                {params.shap_dir} \
+                --S {params.S} \
+                2>&1 | tee {log}
+            """
+
+make_get_top_features_rule("custom", S)
+make_get_top_features_rule("hv_small", S)
+make_get_top_features_rule("hv_med", S)
+make_get_top_features_rule("hv_large", S)

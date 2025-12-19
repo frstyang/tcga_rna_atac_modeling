@@ -11,6 +11,7 @@ from tqdm import tqdm
 parser = argparse.ArgumentParser()
 parser.add_argument('tcga_xena_path')
 parser.add_argument('tcga_clindata_path')
+parser.add_argument('query_genes_path')
 parser.add_argument('output_dir') # where output gene sets are saved
 args = parser.parse_args()
 
@@ -20,6 +21,9 @@ exp_data = pd.read_csv(args.tcga_xena_path, sep='\t')
 exp_data = exp_data[~exp_data.iloc[:, 0].str[0].str.isdigit()]
 exp_data = exp_data.fillna(0)
 exp_data = exp_data.set_index('sample')
+
+query_genes = pd.read_csv(args.query_genes_path, header=None).iloc[:, 0].values
+exp_data = exp_data.loc[exp_data.index.isin(query_genes)]
 
 clinical_data = pd.read_csv(args.tcga_clindata_path, sep='\t')
 clinical_data.head()

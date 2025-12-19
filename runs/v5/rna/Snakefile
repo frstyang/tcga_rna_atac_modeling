@@ -31,6 +31,7 @@ SAMPLESHEET = config["samplesheet"]
 L1_RATIO = config.get("l1_ratio", 0)
 SOLVER = config.get("solver", "lbfgs")
 PENALTY = config.get("penalty", "l2")
+GENES_TO_REMOVE = config.get("genes_to_remove", ["XIST", "SFT*"])
 
 # Conda environments
 SNAPATAC2_ENV = "/home/yangf4/envs/SnapATAC2"
@@ -64,6 +65,7 @@ rule construct_pseudobulks:
     params:
         code_dir = CODE_DIR,
         out_dir = OUT_DIR,
+        genes_to_remove = " ".join(GENES_TO_REMOVE),
     conda: SNAPATAC2_ENV
     threads: 6
     resources:
@@ -76,6 +78,7 @@ rule construct_pseudobulks:
         python -u {params.code_dir}/construct_query_pseudobulks.py \
             {input.samplesheet} \
             {params.out_dir} \
+            --genes_to_remove {params.genes_to_remove} \
             2>&1 | tee {log}
         """
 
@@ -91,6 +94,7 @@ rule log_normalize_pseudobulks:
         query_genes = os.path.join(OUT_DIR, "query_genes.txt"),
     output:
         query_logcpm = os.path.join(OUT_DIR, "query_log2cpm.rds"),
+        query_genes = os.path.join(OUT_DIR, "query_genes.txt")
     params:
         code_dir = CODE_DIR,
         out_dir = OUT_DIR,
@@ -120,6 +124,7 @@ rule create_gene_sets:
     input:
         tcga_xena = TCGA_XENA_PATH,
         tcga_clindata = TCGA_CLINDATA_PATH,
+        query_genes = os.path.join(OUT_DIR, "query_genes.txt"),
     output:
         gene_sets = expand(os.path.join(GENE_SETS_DIR, "{gene_set}.txt"), gene_set=GENE_SETS),
     params:
@@ -137,6 +142,7 @@ rule create_gene_sets:
         python -u {params.code_dir}/create_input_gene_sets.py \
             {input.tcga_xena} \
             {input.tcga_clindata} \
+            {input.query_genes} \
             {params.out_dir} \
             2>&1 | tee {log}
         """

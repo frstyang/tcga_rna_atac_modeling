@@ -4,6 +4,7 @@ import numpy as np
 import os
 import pandas as pd
 import scanpy as sc
+import re
 from scipy import sparse
 from scipy.io import mmwrite
 import snapatac2 as snap
@@ -17,6 +18,7 @@ parser.add_argument('query_samplesheet')
 # and assignments_path is path to a csv where the first column is the
 # barcode and the second column is the assignment to a group.
 parser.add_argument('output_dir') # where pseudobulks are output
+parser.add_argument('--genes_to_remove', nargs='*', default=["XIST"])
 args = parser.parse_args()
 
 os.makedirs(args.output_dir, exist_ok=True)
@@ -75,6 +77,14 @@ for i in tqdm(range(len(all_pseudobulks)), total=len(all_pseudobulks)):
     all_pseudobulks[i] = new_pseudobulks
 all_pseudobulks = sparse.vstack(all_pseudobulks).tocsr()
 all_group_names = [gn for gns in all_group_names for gn in gns]
+
+# Remove unwanted genes
+if args.genes_to_remove:
+    combined = re.compile("|".join(f"{p}" for p in args.genes_to_remove))
+    mask = ~np.array([bool(combined.match(g)) for g in gene_names_union])
+    gene_names_union = gene_names_union[mask]
+    all_pseudobulks = all_pseudobulks[:, gene_names_union]
+
 mmwrite(f'{args.output_dir}/query_pseudobulks.mtx', all_pseudobulks)
 def write_lst(lst, path):
     with open(path, 'w') as f:
