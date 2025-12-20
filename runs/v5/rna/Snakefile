@@ -32,6 +32,7 @@ L1_RATIO = config.get("l1_ratio", 0)
 SOLVER = config.get("solver", "lbfgs")
 PENALTY = config.get("penalty", "l2")
 GENES_TO_REMOVE = config.get("genes_to_remove", ["XIST", "SFT*"])
+SCRAN_NORM = config.get("scran_norm", False)
 
 # Conda environments
 SNAPATAC2_ENV = "/home/yangf4/envs/SnapATAC2"
@@ -97,6 +98,7 @@ rule log_normalize_pseudobulks:
     params:
         code_dir = CODE_DIR,
         out_dir = OUT_DIR,
+        scran_flag = "--scran_norm" if SCRAN_NORM else "",
     conda: INFERCNV_ENV,
     threads: 6
     resources:
@@ -111,6 +113,7 @@ rule log_normalize_pseudobulks:
             {input.query_group_names} \
             {input.query_genes} \
             {params.out_dir} \
+            {params.scran_flag} \
             2>&1 | tee {log}
         """
 

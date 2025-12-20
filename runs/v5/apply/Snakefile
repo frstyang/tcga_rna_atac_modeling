@@ -25,7 +25,7 @@ RNA_C = config["rna_C"]
 DEFAULT_C = config["default_C"]
 EVEN_BARPLOT = config.get("even_barplot", True)
 S = config.get("S", 1)
-COR_THRESHOLD = config.get("cor_threshold", 0.1)
+COR_THRESHOLD = config.get("cor_threshold", 0.05)
 
 # Conda environments
 SNAPATAC2_ENV = config["snapatac2_env"]

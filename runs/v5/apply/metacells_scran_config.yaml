@@ -7,7 +7,7 @@ peak_set: "fdr_1e-6_top_2500_per"
 gene_set: "max_fdr_1e-6_min_logfc_2_top_200_per"
 atac_C: "0.1"
 rna_C: "0.001"
-rna_dir: "../../../out/v5/metacells/rna"
+rna_dir: "../../../out/v5/metacells_scran/rna"
 atac_dir: "../../../out/v5/metacells_scran/atac"
 default_C: "1"
 

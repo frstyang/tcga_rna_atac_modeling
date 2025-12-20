@@ -81,9 +81,9 @@ all_group_names = [gn for gns in all_group_names for gn in gns]
 # Remove unwanted genes
 if args.genes_to_remove:
     combined = re.compile("|".join(f"{p}" for p in args.genes_to_remove))
-    mask = ~np.array([bool(combined.match(g)) for g in gene_names_union])
+    mask = ~np.array([bool(combined.fullmatch(g)) for g in gene_names_union])
     gene_names_union = gene_names_union[mask]
-    all_pseudobulks = all_pseudobulks[:, gene_names_union]
+    all_pseudobulks = all_pseudobulks[:, mask]
 
 mmwrite(f'{args.output_dir}/query_pseudobulks.mtx', all_pseudobulks)
 def write_lst(lst, path):

@@ -9,6 +9,7 @@ parser$add_argument('query_pseudobulks_path')
 parser$add_argument('query_pseudobulks_names_path')
 parser$add_argument('query_genes_path')
 parser$add_argument('output_dir')
+parser$add_argument('--scran_norm', action = 'store_true')
 args <- parser$parse_args()
 
 ## ---- Load counts ----
@@ -23,14 +24,25 @@ query_counts <- t(query_counts)
 frac_nnz <- function(X) nnzero(X) / prod(dim(X))
 sprintf('fraction nonzero of query counts: %f', frac_nnz(query_counts))
 
-y <- DGEList(counts = query_counts)
-## TMMwsp is robust for sparse counts (good for ATAC)
-y <- calcNormFactors(y, method = "TMMwsp")
+if (!args$scran_norm) {
+  y <- DGEList(counts = query_counts)
+  ## TMMwsp is robust for sparse counts
+  y <- calcNormFactors(y, method = "TMMwsp")
 
-## Choose a small prior.count appropriate for sparse ATAC
-## (edgeR scales this by library size internally, so a single value is fine)
-prior <- 1  # you can try 0.25 if you want less smoothing of zeros
-query_logcpm <- cpm(y, log = TRUE, prior.count = prior)  # normalized.lib.sizes=TRUE by default for DGEList
+  ## Choose a small prior.count
+  ## (edgeR scales this by library size internally, so a single value is fine)
+  prior <- 1  # you can try 0.25 if you want less smoothing of zeros
+  query_logcpm <- cpm(y, log = TRUE, prior.count = prior)  # normalized.lib.sizes=TRUE by default for DGEList
+} else {
+  library(scran)
+  sce <- SingleCellExperiment(assays = list(counts = query_counts))
+  clusters <- quickCluster(sce)
+  sce <- computeSumFactors(sce, clusters=clusters)
+  summary(sizeFactors(sce))
+  query_logcpm_sce <- logNormCounts(sce)
+  query_logcpm <- assay(query_logcpm_sce, "logcounts")
+  query_logcpm <- as.matrix(query_logcpm)
+}
 
 ## ---- Pick 10 samples from each cohort (set seed for reproducibility) ----
 set.seed(42)

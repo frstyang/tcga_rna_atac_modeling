@@ -16,7 +16,7 @@ if __name__ == "__main__":
     parser.add_argument("top_features_dir")
     parser.add_argument("output_dir")
     parser.add_argument("--cor_threshold", type=float, default=0.1)
-    parser.add_argument("--tss_dist_threshold", type=int, default=150000)
+    parser.add_argument("--tss_dist_threshold", type=int, default=250000)
     args = parser.parse_args()
 
     print("Loading data")
@@ -67,7 +67,7 @@ if __name__ == "__main__":
                      if n.type == 'region'}
     def write_gene_linked_top_atac_features(dir_path):
         for fname in os.listdir(dir_path):
-            if not re.fullmatch("atac.*_features\.csv", fname):
+            if not re.fullmatch(".*atac.*_features\.csv", fname):
                 continue
             feats_df = pd.read_csv(f"{dir_path}/{fname}", index_col=0)
             linked_genes = []

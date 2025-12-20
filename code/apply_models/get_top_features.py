@@ -6,13 +6,14 @@ import os
 import pandas as pd
 from tqdm import tqdm
 
-def get_feature_contributions_of_type(shap_vals, coefs, shap_sign, coef_sign):
+def get_feature_contributions_of_type(probs, shap_vals, coefs, shap_sign, coef_sign):
     """Gets overall feature contributions of a given type, defined by sign of
     Shapley value and sign of coefficient. E.g. shap_sign=1, coef_sign=1 corresponds
     to features that contribute positively by being present, while shap_sign=1,
     coef_sign=-1 corresponds to features that contribute positively by being absent.
 
     Args:
+        probs (pd.Series): (n_features,) probabilities
         shap_vals (pd.DataFrame): (n_instances, n_features) Shapley values
         coefs (pd.Series): (n_features,) feature coefficients
         shap_sign (int): 1 or -1
@@ -22,14 +23,19 @@ def get_feature_contributions_of_type(shap_vals, coefs, shap_sign, coef_sign):
         pd.Series: (n_features,) feature contributions of provided type, averaged
             across instances
     """
+    if shap_sign == -1:
+        probs = 1 - probs
     shap_vals = shap_vals * shap_sign
     shap_vals = shap_vals.clip(0, None)
+    shap_fracs = shap_vals.div(shap_vals.sum(axis=1), axis=0)
+    shap_contribs = shap_fracs.multiply(probs, axis=0)
+
     coefs = coefs * coef_sign
     coefs = coefs.clip(0, None)
-    shap_vals = shap_vals.multiply(coefs > 0, axis=1)
-    shap_vals = shap_vals.mean(axis=0)
-    shap_vals.name = f'contrib_{shap_sign}_{coef_sign}'
-    return shap_vals
+    shap_contribs = shap_contribs.multiply(coefs > 0, axis=1)
+    shap_contribs = shap_contribs.mean(axis=0)
+    shap_contribs.name = f'contrib_{shap_sign}_{coef_sign}'
+    return shap_contribs
 
 def get_top_feature_contributions(feat_contribs, S=3):
     """Gets top feature contributions using an elbow point method.
@@ -56,6 +62,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('output_dir')
     parser.add_argument('shap_dir')
+    parser.add_argument('probs_file')
     parser.add_argument('--S', help='KneeLocator parameter', type=float, default=3)
     args = parser.parse_args()
     
@@ -63,6 +70,13 @@ if __name__ == '__main__':
     rna_shap_vals = pd.read_csv(f'{args.shap_dir}/rna_shap_vals.csv', index_col=0)
     atac_coefs = pd.read_csv(f'{args.shap_dir}/atac_coefs.csv', index_col=0).iloc[:, 0]
     atac_shap_vals = pd.read_csv(f'{args.shap_dir}/atac_shap_vals.csv', index_col=0)
+    rna_atac_probs = pd.read_csv(args.probs_file, index_col=0)
+    rna_atac_probs.rename(
+        {'RNA_SCC_prob': 'rna', 'ATAC_SCC_prob': 'atac'},
+        inplace=True,
+        axis='columns'
+    )
+    assert np.all(rna_atac_probs.index == atac_shap_vals.index)
     
     signs = {
         (1, 1): 'active_SCC',
@@ -89,6 +103,7 @@ if __name__ == '__main__':
         for sign, contrib_name in signs.items():
             for mod, shap_vals in shap_vals_dict.items():
                 feat_contribs = get_feature_contributions_of_type(
+                    rna_atac_probs[mod],
                     shap_vals,
                     coefs_dict[mod],
                     sign[0],
