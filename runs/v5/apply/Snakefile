@@ -99,7 +99,8 @@ def make_get_top_features_rule(name, S):
         input:
             os.path.join(OUT_DIR, f"apply_{name}", "shap", "atac_shap_vals.csv"),
         output:
-            os.path.join(OUT_DIR, f"apply_{name}", "top_features", "rna_active_SCC_features.csv")
+            os.path.join(OUT_DIR, f"apply_{name}", "top_features", "rna_active_SCC_features.csv"),
+            os.path.join(OUT_DIR, f"apply_{name}", "top_features", "atac_active_SCC_features.csv")
         params:
             code_dir = CODE_DIR,
             shap_dir = os.path.join(OUT_DIR, f"apply_{name}", "shap"),

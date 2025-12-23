@@ -54,7 +54,7 @@ get_config() {
         metacells_scran)
             case "$step" in
                 atac)  echo "metacells_scran" ;;
-                rna)   echo "metacells" ;;
+                rna)   echo "metacells_scran" ;;
                 apply) echo "metacells_scran" ;;
             esac
             ;;
@@ -125,7 +125,7 @@ if [ "$CLEAN_MODE" = true ]; then
     echo "=============================================="
 
     # Track unique directories to avoid deleting same dir twice
-    declare -A CLEANED_DIRS
+    declare -A CLEANED_DIRS=()
 
     for pipeline in "${SELECTED_PIPELINES[@]}"; do
         for step in atac rna apply; do

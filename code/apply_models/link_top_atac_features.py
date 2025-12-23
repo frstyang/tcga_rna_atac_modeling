@@ -63,7 +63,7 @@ if __name__ == "__main__":
         pickle.dump(network, f)
 
     print("Write gene-linked atac feature lists")
-    region_to_ind = {n.id: i for i, n in enumerate(network.nodes())
+    region_to_ind = {n.id: i for i, n in zip(network.node_indices(), network.nodes())
                      if n.type == 'region'}
     def write_gene_linked_top_atac_features(dir_path):
         for fname in os.listdir(dir_path):
@@ -71,13 +71,21 @@ if __name__ == "__main__":
                 continue
             feats_df = pd.read_csv(f"{dir_path}/{fname}", index_col=0)
             linked_genes = []
+            linked_tfs = []
             for region in feats_df.index:
                 if region in region_to_ind:
                     targets = network.successors(region_to_ind[region])
-                    linked_genes.append(";".join([x.id for x in targets]))
+                    linked_genes.append(";".join(sorted([x.id for x in targets])))
+                    tfs = network.predecessors(region_to_ind[region])
+                    def fix(tf):
+                        return tf.replace('.MOUSE', '')
+                    tfs = list(np.unique([fix(x.id) for x in tfs]))
+                    linked_tfs.append(";".join(tfs))
                 else:
                     linked_genes.append("")
+                    linked_tfs.append("")
             feats_df["linked_genes"] = linked_genes
+            feats_df["linked_tfs"] = linked_tfs
             new_fname = fname.replace(".csv", "_linked.csv")
             feats_df.to_csv(f"{dir_path}/{new_fname}")
     samples = np.unique(rna_lognorm.index.str.split('---').str[0])
