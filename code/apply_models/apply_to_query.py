@@ -161,15 +161,27 @@ axes[1].axvline(atac_median, color='b', linestyle='--')
 fig.savefig(f"{args.output_dir}/logits_scatter_plot.png", bbox_inches='tight')
 
 print("Adjusting logits")
-def qscale(x, q=0.95, qrange=5):
+def qscale(x, q=0.95, new_qrange=6):
     q = max(q, 1-q)
     qrange = np.quantile(x, q) - np.quantile(x, 1-q)
-    return x * (5 / qrange)
+    factor = new_qrange / qrange
+    return x * factor, factor
 
-rna_logits_valley_adj = qscale(rna_logits - rna_valley)
-rna_logits_median_adj = qscale(rna_logits - rna_median)
-atac_logits_valley_adj = qscale(atac_logits - atac_valley)
-atac_logits_median_adj = qscale(atac_logits - atac_median)
+rna_logits_valley_adj, rna_valley_f = qscale(rna_logits - rna_valley)
+rna_logits_median_adj, rna_median_f = qscale(rna_logits - rna_median)
+atac_logits_valley_adj, atac_valley_f = qscale(atac_logits - atac_valley)
+atac_logits_median_adj, atac_median_f = qscale(atac_logits - atac_median)
+adjustment_params = pd.DataFrame.from_dict(
+    {
+        'rna_valley': [rna_valley, rna_valley_f],
+        'atac_valley': [atac_valley, atac_valley_f],
+        'rna_median': [rna_median, rna_median_f],
+        'atac_median': [atac_median, atac_median_f]
+    },
+    orient='index',
+    columns=['shift', 'scale']
+)
+adjustment_params.to_csv(f"{args.output_dir}/adjustment_params.csv")
 
 plt.rcParams['font.size'] = 20
 fig, ax = plt.subplots(1, 1, figsize=(8, 4), dpi=150)
@@ -203,6 +215,52 @@ probs_median_adj_df = pd.DataFrame(
     index=rna_X.index
 )
 probs_median_adj_df.to_csv(f"{args.output_dir}/SCC_probs_median_adjusted.csv")
+
+print("====================================================================")
+print("Calculating noise (prediction variance on perturbed data)")
+print("====================================================================")
+perturb_fracs = [0.05, 0.1, 0.2, 0.3, 0.5, 1]
+n_trials = 100
+
+def perturb(X, perturb_frac):
+    pert_n = int(round(X.shape[1] * perturb_frac))
+    inds_to_pert = np.random.permutation(X.shape[1])[:pert_n]
+    new_inds = np.arange(X.shape[1])
+    new_inds[np.isin(new_inds, inds_to_pert)] = inds_to_pert
+    X_perturbed = X.copy()
+    X_perturbed.values[:] = X_perturbed.values[:, new_inds]
+    return X_perturbed
+
+def predict_proba_adj(model, X, shift, scale):
+    logits = model.decision_function(X)
+    logits_adj = (logits - shift) * scale
+    return sigmoid(logits_adj)
+
+def calc_noise(X, model, perturb_frac, shift, scale, n_trials=n_trials):
+    all_pprobs = []
+    for i in range(n_trials):
+        X_perturbed = perturb(X, perturb_frac)
+        pprobs = predict_proba_adj(model, X_perturbed, shift, scale)
+        all_pprobs.append(pprobs)
+    all_pprobs = np.stack(all_pprobs)
+    mean_var = np.mean(np.var(all_pprobs, axis=0))
+    return np.sqrt(mean_var)
+
+noise_dict = {}
+for perturb_frac in perturb_fracs:
+    rna_shift, rna_scale = adjustment_params.loc['rna_median']
+    rna_mean_var = calc_noise(
+        rna_X, rna_model, perturb_frac, rna_shift, rna_scale
+    )
+    atac_shift, atac_scale = adjustment_params.loc['atac_median']
+    atac_mean_var = calc_noise(
+        atac_X, atac_model, perturb_frac, atac_shift, atac_scale
+    )
+    noise_dict[perturb_frac] = [rna_mean_var, atac_mean_var]
+noise_df = pd.DataFrame.from_dict(
+    noise_dict, orient='index', columns=['rna_noise', 'atac_noise']
+)
+noise_df.to_csv(f"{args.output_dir}/noise_levels.csv")
 
 print("====================================================================")
 print("Plotting")
