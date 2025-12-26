@@ -3,6 +3,8 @@ log_dir: "logs_clusters"
 code_dir: "../../../code/apply_models"
 out_dir: "../../../out/v5/clusters"
 
+samplesheet: "clusters_samplesheet.csv"
+
 peak_set: "fdr_1e-6_top_2500_per"
 gene_set: "max_fdr_1e-6_min_logfc_2_top_200_per"
 atac_C: "0.1"

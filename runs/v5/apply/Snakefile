@@ -17,6 +17,9 @@ OUT_DIR = config["out_dir"]
 RNA_DIR = config["rna_dir"]
 ATAC_DIR = config["atac_dir"]
 
+# Samplesheet
+SAMPLESHEET = config["samplesheet"]
+
 # Parameters
 PEAK_SET = config["peak_set"]
 ATAC_C = config["atac_C"]
@@ -40,10 +43,14 @@ for name in names:
     shap_vals = os.path.join(OUT_DIR, f"apply_{name}", "shap", "atac_shap_vals.csv")
     rna_scc_feats = os.path.join(OUT_DIR, f"apply_{name}", "top_features", "rna_active_SCC_features.csv")
     linked_atac_feats = os.path.join(OUT_DIR, f"apply_{name}", "top_features", "atac_active_SCC_features_linked.csv"),
+    rna_preds_on_umap = os.path.join(OUT_DIR, f"apply_{name}", "rna_preds_on_umap.png")
+    knn_devs = os.path.join(OUT_DIR, f"apply_{name}", "SCC_probs_knn_devs.csv")
     all_inputs.append(bar_plot)
     all_inputs.append(shap_vals)
     all_inputs.append(rna_scc_feats)
     all_inputs.append(linked_atac_feats)
+    all_inputs.append(rna_preds_on_umap)
+    all_inputs.append(knn_devs)
 
 rule all:
     input:
@@ -167,3 +174,38 @@ make_link_top_atac_features_rule("custom", PEAK_SET, COR_THRESHOLD)
 make_link_top_atac_features_rule("hv_small", "hvp_5000", COR_THRESHOLD)
 make_link_top_atac_features_rule("hv_med", "hvp_10000", COR_THRESHOLD)
 make_link_top_atac_features_rule("hv_large", "hvp_50000", COR_THRESHOLD)
+
+
+def make_plot_preds_on_umap_rule(name):
+    rule:
+        name: f"apply_to_query_{name}"
+        input:
+            scc_probs_csv = os.path.join(OUT_DIR, f"apply_{name}, "SCC_probs_median_adjusted.csv"),
+        output:
+            rna_preds_on_umap = os.path.join(OUT_DIR, f"apply_{name}", "rna_preds_on_umap.png"),
+            atac_preds_on_umap = os.path.join(OUT_DIR, f"apply_{name}", "atac_preds_on_umap.png"),
+            knn_devs = os.path.join(OUT_DIR, f"apply_{name}", "SCC_probs_knn_devs.csv")
+        params:
+            code_dir = CODE_DIR,
+            out_dir = os.path.join(OUT_DIR, f"apply_{name}"),
+            samplesheet = SAMPLESHEET,
+        conda: SNAPATAC2_ENV
+        threads: 6
+        resources:
+            mem_mb = 48000,
+            runtime = 120,
+        log:
+            os.path.join(LOG_DIR, f"plot_preds_on_umap_{name}.log")
+        shell:
+            """
+            python -u {params.code_dir}/plot_preds_on_umap.py \
+                {params.samplesheet} \
+                {input.scc_probs_csv} \
+                {params.out_dir} \
+                2>&1 | tee {log}
+            """
+
+make_apply_to_query_rule("custom", PEAK_SET, GENE_SET, ATAC_C, RNA_C, EVEN_BARPLOT)
+make_apply_to_query_rule("hv_small", "hvp_5000", "hvg_500", DEFAULT_C, DEFAULT_C, EVEN_BARPLOT)
+make_apply_to_query_rule("hv_med", "hvp_10000", "hvg_3000", DEFAULT_C, DEFAULT_C, EVEN_BARPLOT)
+make_apply_to_query_rule("hv_large", "hvp_50000", "hvg_5000", DEFAULT_C, DEFAULT_C, EVEN_BARPLOT)
