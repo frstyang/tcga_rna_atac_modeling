@@ -42,8 +42,8 @@ for name in names:
     bar_plot = os.path.join(OUT_DIR, f"apply_{name}", "sorted_barplot_median_adjusted.png")
     shap_vals = os.path.join(OUT_DIR, f"apply_{name}", "shap", "atac_shap_vals.csv")
     rna_scc_feats = os.path.join(OUT_DIR, f"apply_{name}", "top_features", "rna_active_SCC_features.csv")
-    linked_atac_feats = os.path.join(OUT_DIR, f"apply_{name}", "top_features", "atac_active_SCC_features_linked.csv"),
-    rna_preds_on_umap = os.path.join(OUT_DIR, f"apply_{name}", "rna_preds_on_umap.png")
+    linked_atac_feats = os.path.join(OUT_DIR, f"apply_{name}", "top_features", "atac_active_SCC_features_linked.csv")
+    rna_preds_on_umap = os.path.join(OUT_DIR, f"apply_{name}", "SCC_RNA_probs_on_umap.png")
     knn_devs = os.path.join(OUT_DIR, f"apply_{name}", "SCC_probs_knn_devs.csv")
     all_inputs.append(bar_plot)
     all_inputs.append(shap_vals)
@@ -104,7 +104,7 @@ def make_get_top_features_rule(name, S):
     rule:
         name: f"get_top_features_{name}"
         input:
-            os.path.join(OUT_DIR, f"apply_{name}", "shap", "atac_shap_vals.csv"),
+            os.path.join(OUT_DIR, f"apply_{name}", "shap", "atac_shap_vals.csv")
         output:
             os.path.join(OUT_DIR, f"apply_{name}", "top_features", "rna_active_SCC_features.csv"),
             os.path.join(OUT_DIR, f"apply_{name}", "top_features", "atac_active_SCC_features.csv")
@@ -178,12 +178,12 @@ make_link_top_atac_features_rule("hv_large", "hvp_50000", COR_THRESHOLD)
 
 def make_plot_preds_on_umap_rule(name):
     rule:
-        name: f"apply_to_query_{name}"
+        name: f"plot_preds_on_umap_{name}"
         input:
-            scc_probs_csv = os.path.join(OUT_DIR, f"apply_{name}, "SCC_probs_median_adjusted.csv"),
+            scc_probs_csv = os.path.join(OUT_DIR, f"apply_{name}", "SCC_probs_median_adjusted.csv"),
         output:
-            rna_preds_on_umap = os.path.join(OUT_DIR, f"apply_{name}", "rna_preds_on_umap.png"),
-            atac_preds_on_umap = os.path.join(OUT_DIR, f"apply_{name}", "atac_preds_on_umap.png"),
+            rna_preds_on_umap = os.path.join(OUT_DIR, f"apply_{name}", "SCC_RNA_probs_on_umap.png"),
+            atac_preds_on_umap = os.path.join(OUT_DIR, f"apply_{name}", "SCC_ATAC_probs_on_umap.png"),
             knn_devs = os.path.join(OUT_DIR, f"apply_{name}", "SCC_probs_knn_devs.csv")
         params:
             code_dir = CODE_DIR,
@@ -205,7 +205,7 @@ def make_plot_preds_on_umap_rule(name):
                 2>&1 | tee {log}
             """
 
-make_apply_to_query_rule("custom", PEAK_SET, GENE_SET, ATAC_C, RNA_C, EVEN_BARPLOT)
-make_apply_to_query_rule("hv_small", "hvp_5000", "hvg_500", DEFAULT_C, DEFAULT_C, EVEN_BARPLOT)
-make_apply_to_query_rule("hv_med", "hvp_10000", "hvg_3000", DEFAULT_C, DEFAULT_C, EVEN_BARPLOT)
-make_apply_to_query_rule("hv_large", "hvp_50000", "hvg_5000", DEFAULT_C, DEFAULT_C, EVEN_BARPLOT)
+make_plot_preds_on_umap_rule("custom")
+make_plot_preds_on_umap_rule("hv_small")
+make_plot_preds_on_umap_rule("hv_med")
+make_plot_preds_on_umap_rule("hv_large")

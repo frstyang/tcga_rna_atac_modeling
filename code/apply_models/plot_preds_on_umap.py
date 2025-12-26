@@ -116,8 +116,8 @@ if __name__ == "__main__":
         fig.savefig(save_path, bbox_inches='tight')
 
     print("Plotting predictions on UMAP")
-    plot_key('RNA_SCC_prob', f'{args.output_dir}/rna_preds_on_umap.png')
-    plot_key('ATAC_SCC_prob', f'{args.output_dir}/atac_preds_on_umap.png')
+    plot_key('RNA_SCC_prob', f'{args.output_dir}/SCC_RNA_probs_on_umap.png')
+    plot_key('ATAC_SCC_prob', f'{args.output_dir}/SCC_ATAC_probs_on_umap.png')
 
     # Calculate knn deviations
     def knn_deviation(k, key):
@@ -134,7 +134,7 @@ if __name__ == "__main__":
                 nn_inds = indices[indptr[i]:indptr[i+1]]
                 i_val = agg_adata.obs[key].iloc[i]
                 nns_vals = agg_adata.obs[key].iloc[nn_inds]
-                devs_this_sample.append(np.abs(i_val - nn_vals))
+                devs_this_sample.append(np.abs(i_val - nns_vals))
             mean_dev = np.concatenate(devs_this_sample).mean()
             devs.append(mean_dev)
         return np.mean(devs)
