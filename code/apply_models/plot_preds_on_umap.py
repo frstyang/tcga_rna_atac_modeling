@@ -46,7 +46,7 @@ if __name__ == "__main__":
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
             mdata = mudata.read(row['rna_atac_h5mu_path'])
-        assignments = pd.read_csv(row['assignments_path'], index_col=0)['SEACell']
+        assignments = pd.read_csv(row['assignments_path'], index_col=0).iloc[:, 0]
         sample_to_mdata_assignments[sample] = (mdata[assignments.index], assignments)
 
     scc_probs = pd.read_csv(args.scc_probs_path, index_col=0)
