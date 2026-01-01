@@ -45,12 +45,14 @@ for name in names:
     linked_atac_feats = os.path.join(OUT_DIR, f"apply_{name}", "top_features", "atac_active_SCC_features_linked.csv")
     rna_preds_on_umap = os.path.join(OUT_DIR, f"apply_{name}", "SCC_RNA_probs_on_umap.png")
     knn_devs = os.path.join(OUT_DIR, f"apply_{name}", "SCC_probs_knn_devs.csv")
+    motif_occ_info = os.path.join(OUT_DIR, f"apply_{name}", "top_features", "motif_occ_info.csv")
     all_inputs.append(bar_plot)
     all_inputs.append(shap_vals)
     all_inputs.append(rna_scc_feats)
     all_inputs.append(linked_atac_feats)
     all_inputs.append(rna_preds_on_umap)
     all_inputs.append(knn_devs)
+    all_inputs.append(motif_occ_info)
 
 rule all:
     input:
@@ -65,7 +67,8 @@ def make_apply_to_query_rule(name, peak_set, gene_set, atac_C, rna_C, even_barpl
         output:
             barplot = os.path.join(OUT_DIR, f"apply_{name}", "sorted_barplot_median_adjusted.png"),
             shap_vals = os.path.join(OUT_DIR, f"apply_{name}", "shap", "atac_shap_vals.csv"),
-            coefs = os.path.join(OUT_DIR, f"apply_{name}", "shap", "atac_coefs.csv")
+            coefs = os.path.join(OUT_DIR, f"apply_{name}", "shap", "atac_coefs.csv"),
+            scc_probs_csv = os.path.join(OUT_DIR, f"apply_{name}", "SCC_probs_median_adjusted.csv"),
         params:
             code_dir = CODE_DIR,
             out_dir = os.path.join(OUT_DIR, f"apply_{name}"),
@@ -209,3 +212,36 @@ make_plot_preds_on_umap_rule("custom")
 make_plot_preds_on_umap_rule("hv_small")
 make_plot_preds_on_umap_rule("hv_med")
 make_plot_preds_on_umap_rule("hv_large")
+
+def make_peak_motif_occurrences_rule(name, peak_set):
+    rule:
+        name: f"peak_motif_occurrences_{name}"
+        input:
+            scc_feats = os.path.join(OUT_DIR, f"apply_{name}", "top_features", "atac_active_SCC_features_linked.csv"),
+        output:
+            motif_occ_info = os.path.join(OUT_DIR, f"apply_{name}", "top_features", "motif_occ_info.csv")
+        params:
+            code_dir = CODE_DIR,
+            top_features_dir = os.path.join(OUT_DIR, f"apply_{name}", "top_features"),
+            peak_set_path = os.path.join(ATAC_DIR, peak_set, "peaks.txt"),
+            all_peaks_path = os.path.join(ATAC_DIR, "query_peaks.txt")
+        conda: SNAPATAC2_ENV
+        threads: 6
+        resources:
+            mem_mb = 48000,
+            runtime = 240,
+        log:
+            os.path.join(LOG_DIR, f"peak_motif_occs_{name}.log")
+        shell:
+            """
+            python -u {params.code_dir}/peak_motif_occurrences.py \
+                {params.top_features_dir} \
+                {params.peak_set_path} \
+                {params.all_peaks_path} \
+                2>&1 | tee {log}
+            """
+
+make_peak_motif_occurrences_rule("custom", PEAK_SET)
+make_peak_motif_occurrences_rule("hv_small", "hvp_5000")
+make_peak_motif_occurrences_rule("hv_med", "hvp_10000")
+make_peak_motif_occurrences_rule("hv_large", "hvp_50000")
