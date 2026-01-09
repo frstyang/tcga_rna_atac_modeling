@@ -1,5 +1,6 @@
 import argparse
 import itertools
+import matplotlib.pyplot as plt
 import numpy as np
 import os
 import pandas as pd
@@ -94,6 +95,11 @@ if __name__ == '__main__':
     genome = Fasta(genome, one_based_attributes=False)
     print(f"Fetching {len(peaks)} regions")
     sequences = [snap._utils.fetch_seq(genome, region) for region in peaks]
+    def compute_gc(seq):
+        seq = seq.upper()
+        gc = (seq.count('G') + seq.count('C')) / len(seq) if len(seq) > 0 else 0
+        return gc
+    peak_gcs = pd.Series([compute_gc(seq) for seq in sequences], index=peaks)
     peak_to_motifs = {peak: [] for peak in peaks}
     
     print("Searching for the binding sites of {} motifs ...".format(len(motifs)))
@@ -125,24 +131,95 @@ if __name__ == '__main__':
             motif_name = get_name(motif_id)
             region_motif_mat.loc[peak, motif_name] = 1
 
-    def write_motif_occ_info(dir_path):
+    def gc_match_subset(region_motif_mat, peak_gcs, subset):
+        """Gets subset of region_motif_mat with matched gc content
+        distribution to input subset
+
+        Args:
+            region_motif_mat (pd.DataFrame): (n_peaks, n_motifs)
+            peak_gcs (pd.Series): (n_peaks,)
+            subset (pd.Index): (n_subset_peaks,)
+
+        Returns:
+            pd.DataFrame (n_gc_matched_peaks, n_motifs)
+        """
+        assert all(np.isin(subset, region_motif_mat.index))
+        non_subset_peaks = np.setdiff1d(peak_gcs.index, subset)
+        non_subset_gcs = peak_gcs.loc[non_subset_peaks].sort_values()
+        
+        tol = 0.05
+        matched_peaks = []
+        counter = 0
+        while True:
+            failed = False
+            for peak in subset:
+                if len(non_subset_gcs) == 0:
+                    failed = True
+                    break
+                gc = peak_gcs[peak]
+
+                i = np.searchsorted(non_subset_gcs.values, gc)
+                i = np.clip(i, 0, len(non_subset_gcs) - 1)
+                
+                # Check if neighbor is closer
+                if i > 0 and np.abs(non_subset_gcs.values[i - 1] - gc) < np.abs(non_subset_gcs.values[i] - gc):
+                    i = i - 1
+                
+                if (np.abs(non_subset_gcs.values[i] - gc) < tol) or (counter < 3):
+                    matched_peak = non_subset_gcs.index[i]
+                    matched_peaks.append(matched_peak)
+                    non_subset_gcs = non_subset_gcs.drop(labels=[matched_peak])
+                else:
+                    failed = True
+                    break
+            if failed:
+                break
+            counter += 1
+        matched_peaks = np.unique(matched_peaks)
+        new_peak_set = np.concatenate((matched_peaks, subset))
+        region_motif_mat = region_motif_mat.loc[new_peak_set]
+        return region_motif_mat
+
+    def write_motif_occ_info(region_motif_mat, dir_path, peak_gcs):
         scc_feats = pd.read_csv(f'{dir_path}/atac_active_SCC_features_linked.csv', index_col=0)
         adc_feats = pd.read_csv(f'{dir_path}/atac_active_ADC_features_linked.csv', index_col=0)
         scc_peaks = scc_feats.index.intersection(region_motif_mat.index)
         adc_peaks = adc_feats.index.intersection(region_motif_mat.index)
+
+        # gc match background
+        assert all(region_motif_mat.index == peak_gcs.index)
+        region_motif_mat_adc = gc_match_subset(region_motif_mat, peak_gcs, adc_peaks)
+        region_motif_mat_scc = gc_match_subset(region_motif_mat, peak_gcs, scc_peaks)
+
+        adc_bg_peaks = np.setdiff1d(region_motif_mat_adc.index, adc_peaks)
+        scc_bg_peaks = np.setdiff1d(region_motif_mat_scc.index, scc_peaks)
+        plt.figure(figsize=(5, 4))
+        plt.hist(peak_gcs[adc_peaks], 20, alpha=0.5, density=True, label='adc')
+        plt.hist(peak_gcs[adc_bg_peaks], 20, alpha=0.5, density=True, label='adc bg')
+        plt.legend()
+        plt.savefig(f"{dir_path}/ADC_peak_gc_dists.png")
+        plt.figure(figsize=(5, 4))
+        plt.hist(peak_gcs[scc_peaks], 20, alpha=0.5, density=True, label='scc')
+        plt.hist(peak_gcs[scc_bg_peaks], 20, alpha=0.5, density=True, label='scc bg')
+        plt.legend()
+        plt.savefig(f"{dir_path}/SCC_peak_gc_dists.png")
+        
         scc_counts = region_motif_mat.loc[scc_peaks].mean(axis=0)
-        adc_counts = region_motif_mat.loc[adc_peaks].mean(axis=0)
-        counts = region_motif_mat.mean(axis=0)
+        adc_counts = region_motif_mat.loc[adc_peaks].mean(axis=0)        
+        scc_bg_counts = region_motif_mat_scc.loc[scc_bg_peaks].mean(axis=0)
+        adc_bg_counts = region_motif_mat_adc.loc[adc_bg_peaks].mean(axis=0)
         
         counts_df = pd.DataFrame(
             {
                 f'scc_{len(scc_peaks)}': scc_counts,
                 f'adc_{len(adc_peaks)}': adc_counts,
-                f'all_{n_total_peaks}': counts
+                f'scc_bg_{len(scc_bg_peaks)}': scc_bg_counts,
+                f'adc_bg_{len(adc_bg_peaks)}': adc_bg_counts,
             }
         )
-        scc_hypergeom_res = hypergeom_test(region_motif_mat, scc_peaks)
-        adc_hypergeom_res = hypergeom_test(region_motif_mat, adc_peaks)
+        
+        scc_hypergeom_res = hypergeom_test(region_motif_mat_scc, scc_peaks)
+        adc_hypergeom_res = hypergeom_test(region_motif_mat_adc, adc_peaks)
         
         counts_df['scc_'+scc_hypergeom_res.columns.astype(str)] = scc_hypergeom_res
         counts_df['adc_'+adc_hypergeom_res.columns.astype(str)] = adc_hypergeom_res
@@ -161,5 +238,5 @@ if __name__ == '__main__':
     ]
     for sample in tqdm(samples):
         sample_dir = f"{args.top_features_dir}/{sample}"
-        write_motif_occ_info(sample_dir)
-    write_motif_occ_info(args.top_features_dir)
+        write_motif_occ_info(region_motif_mat, sample_dir, peak_gcs)
+    write_motif_occ_info(region_motif_mat, args.top_features_dir, peak_gcs)

@@ -27,6 +27,8 @@ tcga_peaks_metadata.index = (
 adata = sc.AnnData(tcga_data.T)
 adata.var[['score', 'annotation', 'GC']] = \
         tcga_peaks_metadata.loc[adata.var_names, ['score', 'annotation', 'GC']]
+adata = adata[:, adata.var['annotation'] != 'Promoter']
+print('adata.shape after restricting to peaks not annotated as Promoter:', adata.shape)
 
 if args.n_top_peaks:
     def calc_sparsity(M):
@@ -37,6 +39,7 @@ if args.n_top_peaks:
     # peaks x metacells
     query_data = pyreadr.read_r(args.query_logcpm_path)[None]
     query_mean_accs = query_data.mean(axis=1)
+    query_mean_accs = query_mean_accs[adata.var_names]
     query_mean_accs_sorted = query_mean_accs.sort_values(
         ascending=False)
     fig, ax = plt.subplots(1, 1, figsize=(5, 4), dpi=150)
@@ -57,8 +60,6 @@ if args.n_top_peaks:
     print(f'Query sparsity after subsetting: {calc_sparsity(query_data)}')
 
 print('adata.shape:', adata.shape)
-adata = adata[:, adata.var['annotation'] != 'Promoter']
-print('adata.shape after restricting to peaks not annotated as Promoter:', adata.shape)
 adata = adata[adata.obs_names.str.startswith('LUAD') | adata.obs_names.str.startswith('LUSC')]
 print('adata.shape after restricting to LUAD or LUSC samples:', adata.shape)
 
@@ -78,6 +79,7 @@ adata.obs['cancer_type'] = adata.obs_names.str.split('_').str[0]
 print(adata.obs['cancer_type'].value_counts())
 
 # sc.tl.rank_genes_groups "Expects logarithmized data"
+adata.X = np.log2(1 + np.power(adata.X, 2))
 sc.tl.rank_genes_groups(adata, 'cancer_type', method='wilcoxon')
 luad_daps_df = sc.get.rank_genes_groups_df(adata, group='LUAD')
 luad_daps_df = luad_daps_df[(luad_daps_df['pvals_adj'] < 1e-6) & (np.abs(luad_daps_df['logfoldchanges']) > 1)]

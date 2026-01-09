@@ -47,7 +47,7 @@ y = adata.obs['cancer_type'].values
 
 print('X.shape', X.shape)
 
-C_vals = [0.001, 0.01, 0.1, 1.0, 10.0, 100.0, 1000.0]
+C_vals = [0.0001, 0.0003, 0.001, 0.01, 0.1, 1.0, 10.0, 100.0]
 print(f"Running cross validation with C values: {C_vals}")
 C_to_scores = {}
 for C in tqdm(C_vals):

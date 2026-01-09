@@ -37,7 +37,7 @@ def get_feature_contributions_of_type(probs, shap_vals, coefs, shap_sign, coef_s
     shap_contribs.name = f'contrib_{shap_sign}_{coef_sign}'
     return shap_contribs
 
-def get_top_feature_contributions(feat_contribs, S=3):
+def get_top_feature_contributions(feat_contribs, S=3, fig_path=None):
     """Gets top feature contributions using an elbow point method.
 
     Args:
@@ -56,6 +56,14 @@ def get_top_feature_contributions(feat_contribs, S=3):
         curve='convex',
         S=S
     )
+    if fig_path:
+        try:
+            plt.figure(figsize=(5, 4))
+            plt.plot(x[:1000], feat_contribs_sorted.values[:1000])
+            plt.axvline(kl.knee, color='r')
+            plt.savefig(fig_path, bbox_inches='tight')
+        except:
+            print("For some reason, plt.axvline(kl.knee, color='r') failed")
     return feat_contribs_sorted.iloc[:kl.knee]
 
 if __name__ == '__main__':
@@ -111,7 +119,8 @@ if __name__ == '__main__':
                 )
                 top_feat_contribs = get_top_feature_contributions(
                     feat_contribs,
-                    S=args.S
+                    S=args.S,
+                    fig_path=f'{sample_dir}/{mod}_{contrib_name}_contribs.png'
                 )
                 top_feat_contribs.to_csv(f'{sample_dir}/{mod}_{contrib_name}_features.csv')
                 across_samples_contribs_dict[sign][mod].append(feat_contribs)
@@ -121,7 +130,11 @@ if __name__ == '__main__':
         for mod, contribs_across_samples in across_samples_contribs_dict[sign].items():
             contribs_across_samples = pd.concat(contribs_across_samples, axis=1)
             mean_contribs = contribs_across_samples.mean(axis=1)
-            top_contribs = get_top_feature_contributions(mean_contribs, S=args.S)
+            top_contribs = get_top_feature_contributions(
+                mean_contribs,
+                S=args.S,
+                fig_path=f'{args.output_dir}/{mod}_{contrib_name}_contribs.png'
+            )
             top_contribs.to_csv(f'{args.output_dir}/{mod}_{contrib_name}_features.csv')
 
     print("Saving recurrent contributions across samples")

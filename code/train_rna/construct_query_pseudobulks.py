@@ -35,7 +35,7 @@ for _, row in tqdm(query_samplesheet_df.iterrows(), total=len(query_samplesheet_
 
     adata = sc.read_h5ad(rna_h5ad_path)
     adata = adata[assignments.index]
-    counts = adata.X
+    counts = adata.layers['counts']
     print('counts.shape:', counts.shape)
     
    # Ensure CSR for fast row slicing & summation

@@ -5,6 +5,7 @@ import numpy as np
 import os
 import pandas as pd
 import pyreadr
+import re
 import scanpy as sc
 from tqdm import tqdm
 
@@ -13,6 +14,7 @@ parser.add_argument('tcga_xena_path')
 parser.add_argument('tcga_clindata_path')
 parser.add_argument('query_genes_path')
 parser.add_argument('output_dir') # where output gene sets are saved
+parser.add_argument('--genes_to_remove', nargs='*', default=["XIST"])
 args = parser.parse_args()
 
 os.makedirs(args.output_dir, exist_ok=True)
@@ -40,6 +42,12 @@ cancer_types = ['LUAD', 'LUSC']
 adata = adata[adata.obs['cancer_type'].isin(cancer_types)]
 print('adata.shape after restricting to LUAD or LUSC samples:', adata.shape)
 print(adata.obs['cancer_type'].value_counts())
+
+# Remove unwanted genes
+if args.genes_to_remove:
+    combined = re.compile("|".join(args.genes_to_remove))
+    genes = [g for g in adata.var_names if not combined.fullmatch(g)]
+    adata = adata[:, genes]
 
 genes = adata.var_names
 results = pd.DataFrame(index=genes, columns=['max_FDR', 'min_log2FC'])

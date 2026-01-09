@@ -63,50 +63,56 @@ def plot_kde(logits, ax=None, label='ATAC', show=True, showpeak=True):
     if ax is None:
         fig, ax = plt.subplots(1, 1, figsize=(8, 4))
     # Create density estimate
-    density = stats.gaussian_kde(logits)
     x_range = np.linspace(logits.min(), logits.max(), 100)
-    density_vals = density(x_range)
 
-    if showpeak:
-        # Find local minima in density
-        peaks, _ = find_peaks(-density_vals)  # negative to find valleys instead of peaks
-        if len(peaks) > 0:
-            # Get the most prominent valley
-            valley_x = x_range[peaks[np.argmax(density_vals[peaks])]]
-        else:
-            # If no clear valley, use median
-            valley_x = np.median(logits)
-        median_x = np.median(logits)
-        ax.axvline(valley_x, color='r', linestyle='-')
-        ax.axvline(median_x, color='b', linestyle='--')
-    
-    # Plot
-    ax.hist(logits, bins=50, density=True, alpha=0.5, label=label)
-    ax.plot(x_range, density_vals, 'k-', lw=2)
-    ax.set_xlabel('Logits')
-    ax.set_ylabel('Density')
-    if show:
-        plt.show()
-    if showpeak:
-        def get_y(frac):
-            ylim = ax.get_ylim()
-            return ylim[0] + frac*(ylim[1] - ylim[0])
-        def get_xd(frac):
-            xlim = ax.get_xlim()
-            return frac*(xlim[1] - xlim[0])
-        if label == 'ATAC':
-            y_frac = 0.8
-        else:
-            y_frac = 0.6
-        ax.text(valley_x + get_xd(0.02), get_y(y_frac - 0.4), f'{valley_x:.2f}', color='r', fontsize=15)
-        ax.text(median_x + get_xd(0.02), get_y(y_frac), f'{median_x:.2f}', color='b', fontsize=15)
-        return valley_x, median_x
+    try:
+        density = stats.gaussian_kde(logits)
+        density_vals = density(x_range)
+        if showpeak:
+            # Find local minima in density
+            peaks, _ = find_peaks(-density_vals)  # negative to find valleys instead of peaks
+            if len(peaks) > 0:
+                # Get the most prominent valley
+                valley_x = x_range[peaks[np.argmax(density_vals[peaks])]]
+            else:
+                # If no clear valley, use median
+                valley_x = np.median(logits)
+            median_x = np.median(logits)
+            ax.axvline(valley_x, color='r', linestyle='-')
+            ax.axvline(median_x, color='b', linestyle='--')
+        
+        # Plot
+        ax.hist(logits, bins=50, density=True, alpha=0.5, label=label)
+        ax.plot(x_range, density_vals, 'k-', lw=2)
+        ax.set_xlabel('Logits')
+        ax.set_ylabel('Density')
+        if show:
+            plt.show()
+        if showpeak:
+            def get_y(frac):
+                ylim = ax.get_ylim()
+                return ylim[0] + frac*(ylim[1] - ylim[0])
+            def get_xd(frac):
+                xlim = ax.get_xlim()
+                return frac*(xlim[1] - xlim[0])
+            if label == 'ATAC':
+                y_frac = 0.8
+            else:
+                y_frac = 0.6
+            ax.text(valley_x + get_xd(0.02), get_y(y_frac - 0.4), f'{valley_x:.2f}', color='r', fontsize=15)
+            ax.text(median_x + get_xd(0.02), get_y(y_frac), f'{median_x:.2f}', color='b', fontsize=15)
+            return valley_x, median_x
+    except:
+        print("for some reason, kde failed")
+        return np.median(logits), np.median(logits)
 
 print("Plotting logits densities")
+is_luas = rna_X.index.str.split('---').str[0].str.startswith('LUAS')
+print(f"Num is_luas: {sum(is_luas)}")
 plt.rcParams['font.size'] = 20
 fig, ax = plt.subplots(1, 1, figsize=(8, 4), dpi=150)
-rna_valley, rna_median = plot_kde(rna_logits, ax=ax, label='RNA', show=False)
-atac_valley, atac_median = plot_kde(atac_logits, ax=ax, label='ATAC', show=False)
+rna_valley, rna_median = plot_kde(rna_logits[is_luas], ax=ax, label='RNA', show=False)
+atac_valley, atac_median = plot_kde(atac_logits[is_luas], ax=ax, label='ATAC', show=False)
 
 print('atac_valley:', atac_valley, 'atac_median:', atac_median)
 print('rna_valley:', rna_valley, 'rna_median:', rna_median)
@@ -114,7 +120,12 @@ print('rna_valley:', rna_valley, 'rna_median:', rna_median)
 ax.legend(fontsize=15.5)
 fig.savefig(f"{args.output_dir}/logits_density_plot.png", bbox_inches='tight')
 
-sample_nums = rna_X.index.str.split('---').str[0].str.split('_').str[1]
+def get_sample_num(instance_name):
+    sample_name = instance_name.split('---')[0]
+    if sample_name.startswith('LUSC'):
+        return 'S' + sample_name.split('_')[1]
+    return sample_name.split('_')[1]
+sample_nums = np.array([get_sample_num(instance_name) for instance_name in rna_X.index])
 sample_means = pd.Series(rna_logits).groupby(sample_nums).mean()
 sample_nums_order = sample_means.sort_values(ascending=False).index
 def plot_logits(sample_nums, logits, ax=None, modality='ATAC', sample_nums_order=None, show=True):
@@ -338,7 +349,7 @@ def plot_stacked_probs(probs, class_labels=None, instance_labels=None,
     return fig, axes
 
 def sorted_barplot(probs_df, save_path, outer_sort_by='rna_prob', inner_sort_by='atac_prob',
-                   even_alloc_per_sample=False):
+                   even_alloc_per_sample=False, figsize=(20, 8)):
     index = probs_df.index
     data = pd.DataFrame({
         'sample': index.str.split('---').str[0],
@@ -360,7 +371,7 @@ def sorted_barplot(probs_df, save_path, outer_sort_by='rna_prob', inner_sort_by=
     sorted_data_atac = pd.concat((sorted_data['atac_prob'], 1 - sorted_data['atac_prob']), axis=1).values
 
     # Create the plot
-    fig, axes = plt.subplots(2, 1, figsize=(20, 8), gridspec_kw={'hspace': 0.18}, sharex=True)
+    fig, axes = plt.subplots(2, 1, figsize=figsize, gridspec_kw={'hspace': 0.2}, sharex=True)
     
     # Define colors and labels
     cmapping = {
@@ -380,36 +391,43 @@ def sorted_barplot(probs_df, save_path, outer_sort_by='rna_prob', inner_sort_by=
     plot_stacked_probs(sorted_data_atac, class_labels=class_labels,
                        instance_labels=sorted_data.index,
                        save_path=None, xlabel='', 
-                       title='ATAC predictions',
+                       title='ATAC classifier predictions',
                        ax=axes[0], cmapping=cmapping, width=barwidth)
     axes[0].set_ylabel('Pred. probability', fontsize=24)
     axes[0].set_xticks([])
     axes[0].get_legend().remove()
-    axes[0].set_title(axes[0].get_title(), fontsize=26)
+    axes[0].set_title(axes[0].get_title(), fontsize=30)
 
     plot_stacked_probs(sorted_data_rna, class_labels=class_labels,
                        instance_labels=sorted_data.index,
                        save_path=None, xlabel='',
-                       title='RNA predictions',
+                       title='RNA classifier predictions',
                        ax=axes[1], cmapping=cmapping, width=barwidth)
     axes[1].set_xticks([])
-    axes[1].set_title(axes[1].get_title(), fontsize=26)
+    axes[1].set_title(axes[1].get_title(), fontsize=30)
     axes[1].set_ylabel('Pred. probability', fontsize=24)
-    axes[1].legend(bbox_to_anchor=(1.01, 1.02), loc="center left", fontsize=22)
+    axes[1].legend(bbox_to_anchor=(1.01, 1.02), loc="center left", fontsize=24)
 
     # Add sample boundaries and labels
-    prev_sample = None
-    for i, sample in enumerate(sorted_data['sample']):
-        if sample != prev_sample:
-            if even_alloc_per_sample:
-                x = np.cumsum(np.append(0, barwidth))[i]
-            else:
-                x = i
-            for ax in axes:
-                ax.axvline(x, color='k', linestyle='--', alpha=0.6)
-                if ax == axes[1]:
-                    ax.text(x, -0.05, sample, rotation=45, ha='right', fontsize=16, rotation_mode='anchor')
-        prev_sample = sample
+    sample_arr = sorted_data['sample'].values
+    sample_arr = np.append('None', sample_arr)
+    breakpoints = np.where(sample_arr[:-1] != sample_arr[1:])[0]
+    breakpoints = np.append(breakpoints, len(sample_arr))
+    barwidth_cumsum = np.cumsum(np.append(0, barwidth))
+    for i in range(len(breakpoints) - 1):
+        bp_curr = breakpoints[i]
+        bp_next = breakpoints[i+1]
+        sample = sample_arr[bp_curr+1]
+        if even_alloc_per_sample:
+            line_x = barwidth_cumsum[bp_curr]
+            label_x = 0.35*barwidth_cumsum[bp_curr] + 0.65*barwidth_cumsum[bp_next-1]
+        else:
+            line_x = bp_curr
+            label_x = 0.35*bp_curr + 0.65*(bp_next - 1)
+        for ax in axes:
+            ax.axvline(line_x, color='k', linestyle='--', alpha=0.6)
+            if ax == axes[1]:
+                ax.text(label_x, -0.07, sample, rotation=45, ha='right', fontsize=24, rotation_mode='anchor')
     
     # Formatting
     for ax in axes:
@@ -419,9 +437,9 @@ def sorted_barplot(probs_df, save_path, outer_sort_by='rna_prob', inner_sort_by=
     fig.savefig(save_path, bbox_inches='tight')
 
 sorted_barplot(probs_valley_adj_df, f'{args.output_dir}/sorted_barplot_valley_adjusted.png',
-               even_alloc_per_sample=args.even_barplot)
+               even_alloc_per_sample=args.even_barplot, figsize=(26, 8))
 sorted_barplot(probs_median_adj_df, f'{args.output_dir}/sorted_barplot_median_adjusted.png',
-               even_alloc_per_sample=args.even_barplot)
+               even_alloc_per_sample=args.even_barplot, figsize=(26, 8))
 
 print("Plot partitioned predictions")
 def partition_probs(probs, coef, shap_vals):
@@ -510,7 +528,8 @@ def partitioned_sorted_barplot(
     save_path,
     outer_sort_by='rna_prob',
     inner_sort_by='atac_prob',
-    even_alloc_per_sample=False
+    even_alloc_per_sample=False,
+    figsize=(20, 8),
 ):
     # get metacell-level partitioned probs
     atac_partitioned_probs = partition_probs(
@@ -553,14 +572,14 @@ def partitioned_sorted_barplot(
     sorted_rna_probs = np.vstack(sorted_rna_probs)
     
     # Create the plot
-    fig, axes = plt.subplots(2, 1, figsize=(20, 8), gridspec_kw={'hspace': 0.18}, sharex=True)
+    fig, axes = plt.subplots(2, 1, figsize=figsize, gridspec_kw={'hspace': 0.2}, sharex=True)
     
     # Define colors and labels
     cmapping = {
-        'Active ADC\nfeature': 'C4',
-        'Inactive SCC\nfeature': '#a384bf',
-        'Active SCC\nfeature': 'goldenrod',
-        'Inactive ADC\nfeature': '#e0c379'
+        'Gain of ADC\nfeature': 'C4',
+        'Loss of SCC\nfeature': '#a384bf',
+        'Gain of SCC\nfeature': 'goldenrod',
+        'Loss of ADC\nfeature': '#e0c379'
     }
     class_labels = list(cmapping.keys())
     reorder = [2, 3, 0, 1]
@@ -579,36 +598,43 @@ def partitioned_sorted_barplot(
     plot_stacked_probs(sorted_atac_probs, class_labels=class_labels,
                        instance_labels=sorted_data.index,
                        save_path=None, xlabel='', 
-                       title='ATAC predictions partitioned by contribution type',
+                       title='ATAC predictions partitioned by feature gain/loss',
                        ax=axes[0], cmapping=cmapping, width=barwidth)
     axes[0].set_ylabel('Pred. probability', fontsize=24)
     axes[0].set_xticks([])
     axes[0].get_legend().remove()
-    axes[0].set_title(axes[0].get_title(), fontsize=26)
+    axes[0].set_title(axes[0].get_title(), fontsize=30)
     
     plot_stacked_probs(sorted_rna_probs, class_labels=class_labels,
                        instance_labels=sorted_data.index,
                        save_path=None, xlabel='',
-                       title='RNA predictions partitioned by contribution type',
+                       title='RNA predictions partitioned by feature gain/loss',
                        ax=axes[1], cmapping=cmapping, width=barwidth)
     axes[1].set_xticks([])
-    axes[1].set_title(axes[1].get_title(), fontsize=26)
+    axes[1].set_title(axes[1].get_title(), fontsize=30)
     axes[1].set_ylabel('Pred. probability', fontsize=24)
-    axes[1].legend(bbox_to_anchor=(1.01, 1.02), loc="center left", fontsize=22)
+    axes[1].legend(bbox_to_anchor=(1.01, 1.02), loc="center left", fontsize=24)
     
     # Add sample boundaries and labels
-    prev_sample = None
-    for i, sample in enumerate(sorted_data['sample']):
-        if sample != prev_sample:
-            if even_alloc_per_sample:
-                x = np.cumsum(np.append(0, barwidth))[i]
-            else:
-                x = i
-            for ax in axes:
-                ax.axvline(x, color='k', linestyle='--', alpha=0.6)
-                if ax == axes[1]:
-                    ax.text(x, -0.05, sample, rotation=45, ha='right', fontsize=16, rotation_mode='anchor')
-        prev_sample = sample
+    sample_arr = sorted_data['sample'].values
+    sample_arr = np.append('None', sample_arr)
+    breakpoints = np.where(sample_arr[:-1] != sample_arr[1:])[0]
+    breakpoints = np.append(breakpoints, len(sample_arr))
+    barwidth_cumsum = np.cumsum(np.append(0, barwidth))
+    for i in range(len(breakpoints) - 1):
+        bp_curr = breakpoints[i]
+        bp_next = breakpoints[i+1]
+        sample = sample_arr[bp_curr+1]
+        if even_alloc_per_sample:
+            line_x = barwidth_cumsum[bp_curr]
+            label_x = 0.35*barwidth_cumsum[bp_curr] + 0.65*(barwidth_cumsum[bp_next-1])
+        else:
+            line_x = bp_curr
+            label_x = 0.35*bp_curr + 0.65*(bp_next - 1)
+        for ax in axes:
+            ax.axvline(line_x, color='k', linestyle='--', alpha=0.6)
+            if ax == axes[1]:
+                ax.text(label_x, -0.07, sample, rotation=45, ha='right', fontsize=24, rotation_mode='anchor')
     
     # Formatting
     for ax in axes:
@@ -622,12 +648,14 @@ partitioned_sorted_barplot(
     rna_shap_vals,
     atac_shap_vals,
     f'{args.output_dir}/partitioned_sorted_barplot_valley_adjusted.png',
-    even_alloc_per_sample=args.even_barplot
+    even_alloc_per_sample=args.even_barplot,
+    figsize=(26,8)
 )
 partitioned_sorted_barplot(
     probs_median_adj_df,
     rna_shap_vals,
     atac_shap_vals,
     f'{args.output_dir}/partitioned_sorted_barplot_median_adjusted.png',
-    even_alloc_per_sample=args.even_barplot
+    even_alloc_per_sample=args.even_barplot,
+    figsize=(26,8)
 )
