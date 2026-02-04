@@ -21,6 +21,16 @@ parser.add_argument('--even_barplot', action='store_true')
 args = parser.parse_args()
 
 os.makedirs(args.output_dir, exist_ok=True)
+has_epigenetic_mod = [
+    'LUAS_22',
+    'LUAS_06',
+    'LUAS_04',
+    'LUAS_13',
+    'LUAS_08',
+    'LUAS_19',
+    'LUAS_16',
+    'LUAS_31'
+]
 
 with open(f'{args.atac_model_dir}/models.pkl', 'rb') as f:
     models = pickle.load(f)
@@ -159,7 +169,7 @@ def plot_logits(sample_nums, logits, ax=None, modality='ATAC', sample_nums_order
 print("Plotting logits scatterplot")
 plt.rcParams['font.size'] = 18
 n_samples = len(np.unique(sample_nums))
-fig, axes = plt.subplots(1, 2, figsize=(12, 0.35*n_samples), dpi=150, gridspec_kw={'wspace': 0.16})
+fig, axes = plt.subplots(1, 2, figsize=(12, 0.36*n_samples), dpi=150, gridspec_kw={'wspace': 0.16})
 plot_logits(sample_nums, rna_logits, ax=axes[0], modality='RNA', sample_nums_order=sample_nums_order, show=False)
 axes[0].axvline(rna_valley, color='r', linestyle='--')
 axes[0].axvline(rna_median, color='b', linestyle='--')
@@ -625,16 +635,20 @@ def partitioned_sorted_barplot(
         bp_curr = breakpoints[i]
         bp_next = breakpoints[i+1]
         sample = sample_arr[bp_curr+1]
+        text_color = 'k'
+        if sample in has_epigenetic_mod:
+            text_color = 'green'
         if even_alloc_per_sample:
             line_x = barwidth_cumsum[bp_curr]
-            label_x = 0.35*barwidth_cumsum[bp_curr] + 0.65*(barwidth_cumsum[bp_next-1])
+            label_x = 0.5*barwidth_cumsum[bp_curr] + 0.5*(barwidth_cumsum[bp_next-1])
         else:
             line_x = bp_curr
-            label_x = 0.35*bp_curr + 0.65*(bp_next - 1)
+            label_x = 0.5*bp_curr + 0.5*(bp_next - 1)
         for ax in axes:
             ax.axvline(line_x, color='k', linestyle='--', alpha=0.6)
             if ax == axes[1]:
-                ax.text(label_x, -0.07, sample, rotation=45, ha='right', fontsize=24, rotation_mode='anchor')
+                ax.text(label_x, -0.07, sample, rotation=45, ha='right',
+                        fontsize=24, rotation_mode='anchor', color=text_color)
     
     # Formatting
     for ax in axes:

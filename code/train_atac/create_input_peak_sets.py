@@ -82,7 +82,9 @@ print(adata.obs['cancer_type'].value_counts())
 adata.X = np.log2(1 + np.power(adata.X, 2))
 sc.tl.rank_genes_groups(adata, 'cancer_type', method='wilcoxon')
 luad_daps_df = sc.get.rank_genes_groups_df(adata, group='LUAD')
-luad_daps_df = luad_daps_df[(luad_daps_df['pvals_adj'] < 1e-6) & (np.abs(luad_daps_df['logfoldchanges']) > 1)]
+print(f"The smallest p value-adj is: {luad_daps_df['pvals_adj'].min()}")
+print(f"The 5%-ile p value-adj is: {luad_daps_df['pvals_adj'].quantile(0.05)}")
+luad_daps_df = luad_daps_df[(luad_daps_df['pvals_adj'] < 1e-3) & (np.abs(luad_daps_df['logfoldchanges']) > 1)]
 print("number of differential peaks", luad_daps_df.shape)
 
 n_top_per = [2500, 1500]

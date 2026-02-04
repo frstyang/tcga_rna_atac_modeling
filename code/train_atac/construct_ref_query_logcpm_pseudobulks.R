@@ -1,4 +1,5 @@
 library(argparse)
+library(dplyr)
 library(edgeR)
 library(ggplot2)
 library(Matrix)
@@ -68,6 +69,10 @@ sprintf('Common peaks after filtering %d', length(common_peaks))
 pancan_raw <- pancan_raw[common_peaks, , drop=FALSE]
 query_counts <- query_counts[common_peaks, , drop=FALSE]
 
+# subset to LUAD/LUSC early on to speed things up
+pancan_raw = pancan_raw[, grep("^(LUSC|LUAD)", colnames(pancan_raw), value = TRUE)]
+sprintf("Subsetted to LUAD/LUSC, now %d columns", dim(pancan_raw)[2])
+
 if (!args$scran_norm) {
   ## ---- Concatenate and normalize jointly ----
   all_counts <- cbind(pancan_raw, query_counts)
@@ -103,6 +108,33 @@ if (!args$scran_norm) {
   query_logcpm <- assay(query_logcpm_sce, "logcounts") # get the actual matrix from SCE object
   query_logcpm <- as.matrix(query_logcpm)
 }
+# Average TCGA replicates belonging to the same sample
+tcga_sample_ids <- sapply(
+    strsplit(colnames(pancan_logcpm), '_'),
+    function(x) {paste(x[1:6], collapse = '_')}
+)
+tcga_sample_ids <- factor(tcga_sample_ids)
+tcga_sample_inds <- match(tcga_sample_ids, levels(tcga_sample_ids))
+onehot_mat <- matrix(
+    0,
+    nrow = ncol(pancan_logcpm),
+    ncol = nlevels(tcga_sample_ids)
+)
+for (i in 1:ncol(pancan_logcpm)) {
+    j <- tcga_sample_inds[i]
+    onehot_mat[i, j] <- 1
+}
+print("dim(onehot_mat):")
+print(dim(onehot_mat))
+sprintf("Number of one entries: %d", sum(onehot_mat))
+avger_mat <- sweep(onehot_mat, 2, colSums(onehot_mat), `/`)
+sprintf("sum(avger_mat): %d", sum(avger_mat))
+print("Averaging TCGA replicates...")
+pancan_logcpm <- pancan_logcpm %*% avger_mat
+colnames(pancan_logcpm) <- levels(tcga_sample_ids)
+print("New pancan_logcpm dim:")
+print(dim(pancan_logcpm))
+
 ## ---- Save LUAS (and TCGA if helpful) ----
 saveRDS(as.data.frame(query_logcpm), file.path(args$output_dir, 'query_log2cpm.rds'))
 saveRDS(pancan_logcpm, file.path(args$output_dir, 'tcga_log2cpm.rds'))

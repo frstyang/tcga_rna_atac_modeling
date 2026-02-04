@@ -44,7 +44,6 @@ clinical_data.head()
 
 sample_to_cancertype = clinical_data[['sample', 'cancer type abbreviation']].set_index('sample').iloc[:, 0].to_dict()
 exp_data = exp_data.iloc[:, exp_data.columns.isin(list(sample_to_cancertype.keys()))]
-print(exp_data.shape)
 cancertype_labels = [sample_to_cancertype[sample] for sample in exp_data.columns]
 adata = sc.AnnData(exp_data.T)
 adata = adata[:, np.unique(adata.var_names, return_index=True)[1]]
@@ -73,6 +72,14 @@ assert args.luad_vs_lusc # for now, only LUAD vs LUSC supported
 if args.luad_vs_lusc:
     cancer_types = ['LUAD', 'LUSC']
 adata = adata[adata.obs['cancer_type'].isin(cancer_types)]
+patient_to_cancer_type = {}
+for sample, cancer_type in adata.obs['cancer_type'].items():
+    patient_to_cancer_type[sample[:-3]] = cancer_type
+# Average samples per patient
+patients = adata.obs_names.str[:-3]
+exp_by_patient = adata.to_df().groupby(patients).mean()
+adata = sc.AnnData(exp_by_patient)
+adata.obs['cancer_type'] = [patient_to_cancer_type[patient] for patient in adata.obs_names]
 
 scoring = ['accuracy', 'balanced_accuracy', 'f1_macro']
 X = adata[:, np.intersect1d(adata.var_names, genes)].to_df()
